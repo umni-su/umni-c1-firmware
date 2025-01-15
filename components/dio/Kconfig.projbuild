@@ -1,0 +1,25 @@
+menu "UMNI PCF8574 OUTPUT"
+
+config DO_I2C_ADDR
+    hex "Адрес PCF8574 (выход)"
+    default 0x27
+    help
+        Адрес микросхемы PCF8574, которая используется как выходы. По умолчанию 0x27.
+
+endmenu
+
+menu "UMNI PCF8574 INPUT"
+
+    config DI_I2C_ADDR
+        hex "Адрес PCF8574 (вход)"
+        default 0x26
+        help
+            Адрес микросхемы PCF8574, которая используется как входы. По умолчанию 0x26.
+
+    config DI_INT_PIN
+        int "Пин прерываний от PCF8574"
+        default 16
+        help
+            Пин, использующися для перехвата прерываний от PCF8574
+            
+    endmenu

@@ -1,0 +1,45 @@
+menu "UMNI Webserver"
+
+    choice UMNI_WEB_DEPLOY_MODE
+        prompt "Website deploy mode"
+        default UMNI_WEB_DEPLOY_SEMIHOST
+        help
+            Режим расположения веб-сайта.
+            См. https://github.com/espressif/esp-idf/blob/master/examples/protocols/http_server/restful_server/README.md#about-deploy-mode
+        config UMNI_WEB_DEPLOY_SEMIHOST
+            bool "Semihost (JTAG is needed)"
+            help
+                Режим SEMIHOST (выбирать для разработки).
+        config UMNI_WEB_DEPLOY_SD
+            depends on IDF_TARGET_ESP32
+            bool "SD card"
+            help
+                Файлы веб-сервера на SD карте.
+        config UMNI_WEB_DEPLOY_SF
+            bool "SPI Nor Flash"
+            help
+                Файлы в SPI Nor Flash.
+    endchoice
+
+    if UMNI_WEB_DEPLOY_SEMIHOST
+        config UMNI_HOST_PATH_TO_MOUNT
+            string "Абсолютный путь до папки блда (билд должен содержать подпапку www)"
+            default "C:\\Develop\\Projects\\UMNI\\umni-frontend\\build"
+            help
+                Если используется SEMIHOST ESP32, нужно указать путь до файлов веб-сервера, который будет примонтирован к VFS.
+                Только абсолютный путь.
+    endif
+
+    config UMNI_WEB_MOUNT_POINT
+        string "Точка монтирования VFS (не указывать, если выбран SEMIHOST)"
+        default "/www"
+        help
+            Укажите точку монирования VFS.
+            
+    config WEBSERVER_MAX_CLIENTS
+        int "Максимальное количество одновременных подключений"
+        default 5
+        help
+            Укажите максимальное количество клиентов веб-сервера.
+
+endmenu
