@@ -12,6 +12,7 @@
 #include "../components/webserver/webserver.h"
 #include "../components/nvs/nvs.h"
 #include "../components/adc/adc.h"
+#include "../components/dio/dio.h"
 #include "../components/1wire/1wire.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
@@ -175,4 +176,21 @@ void app_main(void)
     init_adc();
 
     onewire_init_config();
+
+    init_do();
+
+    do_set_level(DO_1, DO_HIGH);
+    do_set_level(DO_2, DO_LOW);
+    do_set_level(DO_3, DO_HIGH);
+    do_set_level(DO_4, DO_LOW);
+    do_set_level(DO_5, DO_HIGH);
+    do_set_level(DO_6, DO_LOW);
+
+    do_set_level(LED_STAT, DO_HIGH);
+    do_set_level(LED_ERR, DO_HIGH);
+
+    for (int i = 0; i < 6; i++)
+    {
+        ESP_LOGI("do", "DO state %d: %d", i, do_get_level(i));
+    }
 }

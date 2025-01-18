@@ -1,25 +1,121 @@
 menu "UMNI PCF8574 OUTPUT"
 
-config DO_I2C_ADDR
+config UMNI_DO_I2C_ADDR
     hex "Адрес PCF8574 (выход)"
     default 0x27
     help
         Адрес микросхемы PCF8574, которая используется как выходы. По умолчанию 0x27.
+    
+config UMNI_DO_CHAN_1
+    int "DO индекс канала 1"
+    default 0
+    help
+       Индекс регистра цифрового выхода для канала №1.
+
+config UMNI_DO_CHAN_2
+    int "DO индекс канала 2"
+    default 1
+    help
+        Индекс регистра цифрового выхода для канала №2.
+
+config UMNI_DO_CHAN_3
+    int "DO индекс канала 3"
+    default 2
+    help
+        Индекс регистра цифрового выхода для канала №3.
+    
+config UMNI_DO_CHAN_4
+    int "DO индекс канала 4"
+    default 3
+    help
+        Индекс регистра цифрового выхода для канала №4.
+        
+config UMNI_DO_CHAN_5
+    int "DO индекс канала 5"
+    default 4
+    help
+        Индекс регистра цифрового выхода для канала №5.
+
+config UMNI_DO_CHAN_6
+    int "DO индекс канала 6"
+    default 5
+    help
+        Индекс регистра цифрового выхода для канала №6.
+
+config UMNI_STAT_LED
+    int "Индекс светодиода статуса"
+    default 6
+    help
+        Индекс светодиода статуса.
+
+config UMNI_ERR_LED
+    int "Индекс светодиода ошибки"
+    default 7
+    help
+        Индекс светодиода ошибки
 
 endmenu
 
 menu "UMNI PCF8574 INPUT"
 
-    config DI_I2C_ADDR
+    config UMNI_DI_I2C_ADDR
         hex "Адрес PCF8574 (вход)"
         default 0x26
         help
             Адрес микросхемы PCF8574, которая используется как входы. По умолчанию 0x26.
 
-    config DI_INT_PIN
+    config UMNI_DI_INT_PIN
         int "Пин прерываний от PCF8574"
         default 16
         help
             Пин, использующися для перехвата прерываний от PCF8574
+
+    config UMNI_DI_CHAN_1
+        int "DI индекс канала 1"
+        default 0
+        help
+            Индекс регистра цифрового входа для канала №1.
+    
+    config UMNI_DI_CHAN_2
+        int "DI индекс канала 2"
+        default 1
+        help
+            Индекс регистра цифрового входа для канала №2.
+    
+    config UMNI_DI_CHAN_3
+        int "DI индекс канала 3"
+        default 2
+        help
+            Индекс регистра цифрового входа для канала №3.
+        
+    config UMNI_DI_CHAN_4
+        int "DI индекс канала 4"
+        default 3
+        help
+            Индекс регистра цифрового входа для канала №4.
             
-    endmenu
+    config UMNI_DI_CHAN_5
+        int "DI индекс канала 5"
+        default 4
+        help
+            Индекс регистра цифрового входа для канала №5.
+    
+    config UMNI_DI_CHAN_6
+        int "DI индекс канала 6"
+        default 5
+        help
+            Индекс регистра цифрового входа для канала №6.
+    
+    config UMNI_FN_BTN
+        int "Индекс функциональной кнопки"
+        default 6
+        help
+            Индекс светодиода статуса.
+    
+    config UMNI_CFG_INP
+        int "Индекс канала входа в конфигурационный режима"
+        default 7
+        help
+            Индекс канала входа в конфигурационный режима (перемычка)
+    
+endmenu
