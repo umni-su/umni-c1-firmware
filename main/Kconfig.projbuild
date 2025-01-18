@@ -27,17 +27,8 @@ menu "UMNI адаптер Opentherm"
 endmenu
 
 # ADC
-menu "UMNI аналоговые порты"
-    config UMNI_ADC_1
-        int "Канал ADC 1"
-        default 36
-    config UMNI_ADC_2
-        int "Канал ADC 1"
-        default 39
-    config UMNI_ADC_3
-        int "Канал ADC 1"
-        default 34
-    config UMNI_ADC_4
-        int "Канал ADC 1"
-        default 35
+menu "UMNI SD card"
+    config UMNI_SD_CS
+        int "SD-CS пин карты памяти"
+        default 27
 endmenu

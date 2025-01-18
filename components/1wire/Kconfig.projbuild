@@ -1,0 +1,8 @@
+menu "UMNI 1-WIRE"
+    config UMNI_ONEWIRE_PIN
+        int "1-WIRE пин данных"
+        default 27
+        help
+            1-WIRE пин данных
+
+endmenu

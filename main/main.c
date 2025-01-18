@@ -12,6 +12,7 @@
 #include "../components/webserver/webserver.h"
 #include "../components/nvs/nvs.h"
 #include "../components/adc/adc.h"
+#include "../components/1wire/1wire.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 
@@ -146,8 +147,11 @@ void app_main(void)
     gpio_set_intr_type(INT_PIN, GPIO_INTR_NEGEDGE);
     // gpio_intr_enable(INT_PIN);
 
+    // TEST DIO
     // xTaskCreatePinnedToCore(test, "do", 4095, NULL, 13, &do_handle, 1);
     // xTaskCreatePinnedToCore(test_inp, "di", 4095, NULL, 13, &di_handle, 1);
+    // TEST DIO END
+
     vTaskDelay(pdMS_TO_TICKS(200));
     ethernet_start();
     // webserver_start();
@@ -161,7 +165,7 @@ void app_main(void)
 
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
 
-    slot_config.gpio_cs = GPIO_NUM_17;
+    slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     slot_config.host_id = 1;
     // ret = spi_bus_add_device(CONFIG_EXAMPLE_ETH_SPI_HOST,  &buscfg, NULL);
@@ -169,4 +173,6 @@ void app_main(void)
     sdmmc_card_print_info(stdout, card);
 
     init_adc();
+
+    onewire_init_config();
 }
