@@ -29,10 +29,10 @@
 
 typedef enum
 {
-    AN_NTC_1 = 0, // GPIO36
-    AN_NTC_2 = 3, // GPIO39
-    AN_INP_1 = 6, // GPIO34
-    AN_INP_2 = 2  // GPIO35
+    AN_NTC_1 = CONFIG_UMNI_NTC_1, // GPIO36
+    AN_NTC_2 = CONFIG_UMNI_NTC_2, // GPIO39
+    AN_INP_1 = CONFIG_UMNI_ADC_1, // GPIO34
+    AN_INP_2 = CONFIG_UMNI_ADC_2  // GPIO35
 } analog_inputs_t;
 
 /// @brief Тут хранится элемент конфигурации канала: активен ли он и его метка
