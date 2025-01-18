@@ -1,16 +1,17 @@
 #pragma once
 
-#include "esp_adc/adc_oneshot.h"
-//#include "esp_adc/adc_cali.h"
-//#include "esp_adc/adc_cali_scheme.h"
-//#include "cJSON.h"
+#include "ntc_driver.h"
+// #include "esp_adc/adc_cali.h"
+// #include "esp_adc/adc_cali_scheme.h"
+// #include "cJSON.h"
 
 #define NTC_ADC_UNIT ADC_UNIT_1
 #define NTC_ADC_ATTEN ADC_ATTEN_DB_6
 #define ONE_WIRE_TASK_PRIORITY 13
 #define ADC_TASK_TIMEOUT 1000
 
-#define ADC_PORTS_COUNT 4
+#define TOTAL_ANALOG_CHANNELS 4
+#define TOTAL_NTC_CHANNELS 2
 #define ADC_MAX_LABEL_LENGTH 16
 
 #define NTC_READ_LEN 256
@@ -26,20 +27,18 @@
     ADC1_CHANNEL_7,     !< ADC1 channel 7 is GPIO35
 */
 
-#define ADC1_CHAN1 ADC_CHANNEL_0 // GPIO36
-#define ADC1_CHAN2 ADC_CHANNEL_3 // GPIO39
-#define ADC1_CHAN3 ADC_CHANNEL_6 // GPIO34
-#define ADC1_CHAN4 ADC_CHANNEL_7 // GPIO35
-
 typedef enum
 {
-    TYPE_NONE = 0,
-    TYPE_NTC_THERMISTOR = 1
-} adc_port_config_types_t;
+    AN_NTC_1 = 0, // GPIO36
+    AN_NTC_2 = 3, // GPIO39
+    AN_INP_1 = 6, // GPIO34
+    AN_INP_2 = 2  // GPIO35
+} analog_inputs_t;
 
+/// @brief Тут хранится элемент конфигурации канала: активен ли он и его метка
 typedef struct
 {
-    int channel;
+    analog_inputs_t channel;
     bool enabled;
     int type;
     char *label;
@@ -49,7 +48,6 @@ typedef struct
 {
     int channel;
     int beta;
-    int width_bit;
 } ntc_thermistor_config_t;
 
 typedef struct
@@ -61,7 +59,9 @@ typedef struct
 
 void init_adc();
 
-void initialize_adc_channel();
+ntc_device_handle_t get_ntc_handle(analog_inputs_t chan);
+
+void initialize_ntc_channel(analog_inputs_t ntc_channel, ntc_device_handle_t *handle, int beta_value);
 
 void get_adc_config(char *adc_config_name, adc_port_config_t *adc_port_config);
 
