@@ -8,7 +8,7 @@
 #define NTC_ADC_UNIT ADC_UNIT_1
 #define NTC_ADC_ATTEN ADC_ATTEN_DB_6
 #define ONE_WIRE_TASK_PRIORITY 13
-#define ADC_TASK_TIMEOUT 1000
+#define ADC_TASK_TIMEOUT 10000
 
 #define TOTAL_ANALOG_CHANNELS 4
 #define TOTAL_NTC_CHANNELS 2
@@ -59,9 +59,7 @@ typedef struct
 
 void init_adc();
 
-ntc_device_handle_t get_ntc_handle(analog_inputs_t chan);
-
-void initialize_ntc_channel(analog_inputs_t ntc_channel, ntc_device_handle_t *handle, int beta_value);
+esp_err_t initialize_ntc_channels();
 
 void get_adc_config(char *adc_config_name, adc_port_config_t *adc_port_config);
 
@@ -70,3 +68,5 @@ void get_ntc_termistor_data(ntc_thermistor_config_t ntc_thermistor_config, ntc_d
 adc_port_config_t get_ntc_adc_port_config(adc_channel_t adc_channel);
 
 void ntc_queue_task(void *ntc_data);
+
+float get_ntc_data_channel_temp(adc_channel_t channel);
