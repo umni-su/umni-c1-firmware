@@ -39,10 +39,32 @@ typedef enum
     DO_LOW = 0
 } do_level_t;
 
+typedef struct
+{
+    di_port_index_t chan;
+    int timeout;
+    int count;
+    int pause;
+} led_blink_t;
+
 esp_err_t init_do();
 
 do_level_t do_get_level(do_port_index_t channel);
 
 esp_err_t do_set_level(do_port_index_t channel, do_level_t level);
+
+void do_blink_led_stat_start_at_boot();
+
+void do_blink_led_stat_start_working();
+
+void do_blink_led_stat_start_flashing();
+
+void do_blink_led_error();
+
+void do_blink_led_start_task(void *arg);
+
+void do_blink_led_stop(do_port_index_t channel);
+
+esp_err_t do_register_events();
 
 esp_err_t init_di();

@@ -1,12 +1,24 @@
 #include "dio.h"
+#include "../../main/includes/events.h"
+#include "esp_event.h"
 
 uint8_t input_data = 0xff;
 
-uint8_t output_data = 0x00;
+uint8_t output_data = 0xff;
 
 static i2c_dev_t pcf8574_outputs;
 
 static i2c_dev_t pcf8574_inputs;
+
+bool need_blink_stat = false;
+
+bool need_blink_err = false;
+
+esp_err_t do_register_events()
+{
+    return ESP_OK;
+    // return esp_event_handler_register(APP_EVENTS, S_CONFIG_SPIFFS_READY, &config_spiffs_mounted, NULL);
+}
 
 esp_err_t init_do()
 {
@@ -17,6 +29,7 @@ esp_err_t init_do()
     if (res == ESP_OK)
     {
         res = pcf8574_port_write(&pcf8574_outputs, output_data);
+        esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else
     {
@@ -59,4 +72,112 @@ esp_err_t init_di()
 {
 
     return ESP_OK;
+}
+
+/// @brief Задача обработки мигания системных светодиодов
+/// @param arg
+void do_blink_led_start_task(void *arg)
+{
+    led_blink_t *led_blink_conf = (led_blink_t *)arg;
+    int timeout = led_blink_conf->timeout;
+    int count = (int)led_blink_conf->count;
+    int pause = (int)led_blink_conf->pause;
+    di_port_index_t chan = (int)led_blink_conf->chan;
+    ESP_LOGI("do_blink_led_stat_start_task", "Timeout: %d, pause: %d, count: %d", timeout, pause, count);
+
+    while (need_blink_stat)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            do_set_level(chan, DO_HIGH);
+            vTaskDelay(timeout / portTICK_PERIOD_MS);
+            do_set_level(chan, DO_LOW);
+            vTaskDelay(timeout / portTICK_PERIOD_MS);
+        }
+        vTaskDelay(pause / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
+
+/// @brief Индикация загрузки при включении
+void do_blink_led_stat_start_at_boot()
+{
+    do_blink_led_stop(LED_STAT);
+    need_blink_stat = true;
+    led_blink_t led_blink_conf = {
+        .chan = LED_STAT,
+        .count = 2,
+        .pause = 0,
+        .timeout = 500};
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_at_boot", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+}
+
+/// @brief Индикация нормального режима работы
+void do_blink_led_stat_start_working()
+{
+    do_blink_led_stop(LED_STAT);
+    need_blink_stat = true;
+    led_blink_t led_blink_conf = {
+        .chan = LED_STAT,
+        .count = 1,
+        .pause = 10000,
+        .timeout = 100};
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_working", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+}
+
+/// @brief Индикация при прошивке
+void do_blink_led_stat_start_flashing()
+{
+    do_blink_led_stop(LED_STAT);
+    need_blink_stat = true;
+    led_blink_t led_blink_conf = {
+        .chan = LED_STAT,
+        .count = 1,
+        .pause = 0,
+        .timeout = 200};
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_flashing", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+}
+
+/// @brief Индикация ошибки
+void do_blink_led_error()
+{
+    do_blink_led_stop(LED_ERR);
+    need_blink_err = true;
+    led_blink_t led_blink_conf = {
+        .chan = LED_ERR,
+        .count = 4,
+        .pause = 0,
+        .timeout = 1500};
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_error", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+}
+
+/// @brief Остановка индикации
+/// @param channel
+void do_blink_led_stop(do_port_index_t channel)
+{
+    switch (channel)
+    {
+    case LED_STAT:
+        need_blink_stat = false;
+        break;
+    case LED_ERR:
+        need_blink_err = false;
+        break;
+    default:
+        break;
+    }
+}
+
+void do_blink_led_err_start(int timeout)
+{
+    need_blink_err = true;
+}
+
+void do_blink_led_err_stop()
+{
+    need_blink_err = false;
+}
+
+void do_blink_led_err_start_task(void *arg)
+{
 }

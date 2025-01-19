@@ -5,6 +5,8 @@
 #include <pcf8574.h>
 #include <string.h>
 
+#include "includes/events.h"
+
 #include "esp_event.h"
 #include "esp_netif.h"
 
@@ -21,75 +23,29 @@ static const char *TAG = "main";
 
 ESP_EVENT_DEFINE_BASE(APP_EVENTS);
 
-static i2c_dev_t pcf8574;
-
 static i2c_dev_t pcf8574_inp;
 
 static TaskHandle_t do_handle;
 static TaskHandle_t di_handle;
-
-#define I2C_ADDR 0x27
-#define I2C_MASTER_SCL 22
-#define I2C_MASTER_SDA 21
-#define INP_I2C_ADDR 0x26
-#define INT_PIN GPIO_NUM_16
 
 static void IRAM_ATTR catch_interrupts(void *args)
 {
     ESP_DRAM_LOGI("IRAM", "Catch!");
 }
 
-void test(void *pvParameters)
-{
-    uint8_t data = 0xff;
-    memset(&pcf8574, 0, sizeof(i2c_dev_t));
-    pcf8574.cfg.master.clk_speed = 5000; // Hz
-    ESP_ERROR_CHECK(pcf8574_init_desc(&pcf8574, I2C_ADDR, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
-    pcf8574_port_write(&pcf8574, data);
-    uint8_t res = 0xff;
-    while (true)
-    {
-        ESP_LOGI(TAG, "=========");
-
-        // data = ~data;
-
-        pcf8574_port_read(&pcf8574, &res);
-        for (int i = 0; i < 8; i++)
-        {
-            int level = res >> i & 0x01;
-            if (level != 1)
-            {
-                res = res | (1 << i);
-            }
-            else
-            {
-                res = res & ~(1 << i);
-            }
-            pcf8574_port_write(&pcf8574, res);
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            ESP_LOGI(TAG, "Read data from pcf %d - %d", i, level);
-        }
-        size_t total_heap_size = heap_caps_get_total_size(MALLOC_CAP_8BIT);
-        size_t free_heap_size = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-        ESP_LOGW("HEAP", "\r\nHEAP total: %d, free: %d\r\n", total_heap_size, free_heap_size);
-        // vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-    vTaskDelete(NULL);
-}
-
-void test_inp(void *pvParameters)
-{
-    memset(&pcf8574_inp, 0, sizeof(i2c_dev_t));
-    pcf8574_inp.cfg.master.clk_speed = 5000; // Hz
-    ESP_ERROR_CHECK(pcf8574_init_desc(&pcf8574_inp, INP_I2C_ADDR, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
-    uint8_t inp = 0xff;
-    pcf8574_port_write(&pcf8574_inp, inp);
-    vTaskDelete(NULL);
-}
+// void test_inp(void *pvParameters)
+// {
+//     memset(&pcf8574_inp, 0, sizeof(i2c_dev_t));
+//     pcf8574_inp.cfg.master.clk_speed = 5000; // Hz
+//     ESP_ERROR_CHECK(pcf8574_init_desc(&pcf8574_inp, INP_I2C_ADDR, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
+//     uint8_t inp = 0xff;
+//     pcf8574_port_write(&pcf8574_inp, inp);
+//     vTaskDelete(NULL);
+// }
 
 void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
-    ESP_LOGI(TAG, "EVENT IS %08lX", id);
+    ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
 }
 
 #if CONFIG_EXAMPLE_WEB_DEPLOY_SEMIHOST
@@ -142,11 +98,11 @@ void app_main(void)
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
 
-    gpio_set_direction(INT_PIN, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(INT_PIN, GPIO_FLOATING);
-    gpio_isr_handler_add(INT_PIN, catch_interrupts, NULL);
-    gpio_set_intr_type(INT_PIN, GPIO_INTR_NEGEDGE);
-    // gpio_intr_enable(INT_PIN);
+    // gpio_set_direction(INT_PIN, GPIO_MODE_INPUT);
+    // gpio_set_pull_mode(INT_PIN, GPIO_FLOATING);
+    // gpio_isr_handler_add(INT_PIN, catch_interrupts, NULL);
+    // gpio_set_intr_type(INT_PIN, GPIO_INTR_NEGEDGE);
+    // //gpio_intr_enable(INT_PIN);
 
     // TEST DIO
     // xTaskCreatePinnedToCore(test, "do", 4095, NULL, 13, &do_handle, 1);
@@ -186,8 +142,8 @@ void app_main(void)
     do_set_level(DO_5, DO_HIGH);
     do_set_level(DO_6, DO_LOW);
 
-    do_set_level(LED_STAT, DO_HIGH);
-    do_set_level(LED_ERR, DO_HIGH);
+    // do_set_level(LED_STAT, DO_HIGH);
+    // do_set_level(LED_ERR, DO_HIGH);
 
     for (int i = 0; i < 6; i++)
     {
