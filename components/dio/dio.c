@@ -2,7 +2,7 @@
 #include "../../main/includes/events.h"
 #include "esp_event.h"
 
-uint8_t input_data[8] = {1};
+uint8_t input_data = 0xff;
 
 uint8_t output_data = 0xff;
 
@@ -178,7 +178,7 @@ void do_blink_led_err_start_task(void *arg)
 
 static void IRAM_ATTR catch_di_interrupts(void *args)
 {
-    xTaskCreate(di_interrupt_task, "di_interrupt_task", configMINIMAL_STACK_SIZE * 6, NULL, 20, NULL);
+    xTaskCreate(di_interrupt_task, "di_interrupt_task", 4096, NULL, 20, NULL);
 }
 
 esp_err_t init_di()
@@ -205,14 +205,19 @@ void di_interrupt_task(void *arg)
 {
     uint8_t current_state;
     pcf8574_port_read(&pcf8574_input_dev_t, &current_state);
-    for (int i = 0; i <= 6; i++)
+    for (int i = 0; i < 8; i++)
     {
         int pin_level = current_state >> i & 0x01;
-        if (pin_level != input_data[i])
+        int current_pin__level = input_data >> i & 0x01;
+        if (pin_level != current_pin__level)
         {
             ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
-            input_data[i] = pin_level; // set last level to input pins
+            input_data = current_state; // set last level to input pins
         }
+        // else
+        // {
+
+        //}
     }
     vTaskDelete(NULL);
 }
