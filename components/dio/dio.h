@@ -68,3 +68,5 @@ void do_blink_led_stop(do_port_index_t channel);
 esp_err_t do_register_events();
 
 esp_err_t init_di();
+
+void di_interrupt_task(void *arg);

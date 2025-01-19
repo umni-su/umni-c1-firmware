@@ -2,13 +2,13 @@
 #include "../../main/includes/events.h"
 #include "esp_event.h"
 
-uint8_t input_data = 0xff;
+uint8_t input_data[8] = {1};
 
 uint8_t output_data = 0xff;
 
-static i2c_dev_t pcf8574_outputs;
+static i2c_dev_t pcf8574_output_dev_t;
 
-static i2c_dev_t pcf8574_inputs;
+static i2c_dev_t pcf8574_input_dev_t;
 
 bool need_blink_stat = false;
 
@@ -23,12 +23,12 @@ esp_err_t do_register_events()
 esp_err_t init_do()
 {
     esp_err_t res = ESP_OK;
-    memset(&pcf8574_outputs, 0, sizeof(i2c_dev_t));
-    pcf8574_outputs.cfg.master.clk_speed = 5000; // Hz
-    res = pcf8574_init_desc(&pcf8574_outputs, I2C_DO_ADDR, 0, CONFIG_UMNI_I2C_SDA, CONFIG_UMNI_I2C_SCL);
+    memset(&pcf8574_output_dev_t, 0, sizeof(i2c_dev_t));
+    pcf8574_output_dev_t.cfg.master.clk_speed = 5000; // Hz
+    res = pcf8574_init_desc(&pcf8574_output_dev_t, I2C_DO_ADDR, 0, CONFIG_UMNI_I2C_SDA, CONFIG_UMNI_I2C_SCL);
     if (res == ESP_OK)
     {
-        res = pcf8574_port_write(&pcf8574_outputs, output_data);
+        res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else
@@ -41,7 +41,7 @@ esp_err_t init_do()
 
 do_level_t do_get_level(do_port_index_t channel)
 {
-    esp_err_t res = pcf8574_port_read(&pcf8574_outputs, &output_data);
+    esp_err_t res = pcf8574_port_read(&pcf8574_output_dev_t, &output_data);
     if (res == ESP_OK)
     {
         // Так как 0 на ножке pcf8574 инвертируется через логический конвертер в 1, тут применяется инверсия результата
@@ -65,13 +65,7 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
         output_data = output_data & ~(1 << channel);
     }
     // output_data = output_data >> channel & level;
-    return pcf8574_port_write(&pcf8574_outputs, output_data);
-}
-
-esp_err_t init_di()
-{
-
-    return ESP_OK;
+    return pcf8574_port_write(&pcf8574_output_dev_t, output_data);
 }
 
 /// @brief Задача обработки мигания системных светодиодов
@@ -180,4 +174,45 @@ void do_blink_led_err_stop()
 
 void do_blink_led_err_start_task(void *arg)
 {
+}
+
+static void IRAM_ATTR catch_di_interrupts(void *args)
+{
+    xTaskCreate(di_interrupt_task, "di_interrupt_task", configMINIMAL_STACK_SIZE * 6, NULL, 20, NULL);
+}
+
+esp_err_t init_di()
+{
+    esp_err_t res = ESP_OK;
+    gpio_set_direction(CONFIG_UMNI_DI_INT_PIN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(CONFIG_UMNI_DI_INT_PIN, GPIO_FLOATING);
+    gpio_isr_handler_add(CONFIG_UMNI_DI_INT_PIN, catch_di_interrupts, NULL);
+    gpio_set_intr_type(CONFIG_UMNI_DI_INT_PIN, GPIO_INTR_ANYEDGE);
+    gpio_intr_enable(CONFIG_UMNI_DI_INT_PIN);
+
+    memset(&pcf8574_input_dev_t, 0, sizeof(i2c_dev_t));
+    pcf8574_input_dev_t.cfg.master.clk_speed = 5000; // Hz
+    res = pcf8574_init_desc(&pcf8574_input_dev_t, I2C_DI_ADDR, 0, CONFIG_UMNI_I2C_SDA, CONFIG_UMNI_I2C_SCL);
+    if (res == ESP_OK)
+    {
+        pcf8574_port_write(&pcf8574_input_dev_t, (uint8_t)input_data);
+    }
+
+    return res;
+}
+
+void di_interrupt_task(void *arg)
+{
+    uint8_t current_state;
+    pcf8574_port_read(&pcf8574_input_dev_t, &current_state);
+    for (int i = 0; i <= 6; i++)
+    {
+        int pin_level = current_state >> i & 0x01;
+        if (pin_level != input_data[i])
+        {
+            ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
+            input_data[i] = pin_level; // set last level to input pins
+        }
+    }
+    vTaskDelete(NULL);
 }

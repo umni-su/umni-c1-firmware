@@ -28,21 +28,6 @@ static i2c_dev_t pcf8574_inp;
 static TaskHandle_t do_handle;
 static TaskHandle_t di_handle;
 
-static void IRAM_ATTR catch_interrupts(void *args)
-{
-    ESP_DRAM_LOGI("IRAM", "Catch!");
-}
-
-// void test_inp(void *pvParameters)
-// {
-//     memset(&pcf8574_inp, 0, sizeof(i2c_dev_t));
-//     pcf8574_inp.cfg.master.clk_speed = 5000; // Hz
-//     ESP_ERROR_CHECK(pcf8574_init_desc(&pcf8574_inp, INP_I2C_ADDR, 0, I2C_MASTER_SDA, I2C_MASTER_SCL));
-//     uint8_t inp = 0xff;
-//     pcf8574_port_write(&pcf8574_inp, inp);
-//     vTaskDelete(NULL);
-// }
-
 void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
     ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
@@ -92,17 +77,14 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_any_event, NULL));
 
-    ESP_ERROR_CHECK(init_nvs());
-
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
 
-    // gpio_set_direction(INT_PIN, GPIO_MODE_INPUT);
-    // gpio_set_pull_mode(INT_PIN, GPIO_FLOATING);
-    // gpio_isr_handler_add(INT_PIN, catch_interrupts, NULL);
-    // gpio_set_intr_type(INT_PIN, GPIO_INTR_NEGEDGE);
-    // //gpio_intr_enable(INT_PIN);
+    ESP_ERROR_CHECK(init_nvs());
+
+    ESP_ERROR_CHECK(init_do());
+    ESP_ERROR_CHECK(init_di());
 
     // TEST DIO
     // xTaskCreatePinnedToCore(test, "do", 4095, NULL, 13, &do_handle, 1);
@@ -132,8 +114,6 @@ void app_main(void)
     init_adc();
 
     onewire_init_config();
-
-    init_do();
 
     do_set_level(DO_1, DO_HIGH);
     do_set_level(DO_2, DO_LOW);
