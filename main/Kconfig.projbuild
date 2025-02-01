@@ -26,9 +26,13 @@ menu "UMNI адаптер Opentherm"
             Входной сигнал с линии Opentherm.
 endmenu
 
-# ADC
+# SD card
 menu "UMNI SD card"
     config UMNI_SD_CS
         int "SD-CS пин карты памяти"
         default 27
+
+    config UMNI_SD_MOUNT_POINT
+        string  "Точка монтирования SD карты"
+        default "/sdcard"
 endmenu

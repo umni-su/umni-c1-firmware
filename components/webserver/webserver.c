@@ -12,7 +12,6 @@
 #include "esp_http_server.h"
 #include "esp_vfs_fat.h"
 
-
 #if SOC_SDMMC_HOST_SUPPORTED
 #include "driver/sdmmc_host.h"
 #endif
@@ -21,7 +20,7 @@
 static const char *WEBSERVER_TAG = "webserver";
 
 /* IMPORT METHODS FROM REST_SERVER */
-//esp_err_t start_rest_server(const char *base_path);
+esp_err_t start_rest_server(const char *base_path);
 
 /* END IMPORT METHODS FROM REST_SERVER */
 
@@ -29,7 +28,8 @@ static esp_err_t s_example_write_file(const char *path, char *data)
 {
     ESP_LOGI(WEBSERVER_TAG, "Opening file %s", path);
     FILE *f = fopen(path, "w");
-    if (f == NULL) {
+    if (f == NULL)
+    {
         ESP_LOGE(WEBSERVER_TAG, "Failed to open file for writing");
         return ESP_FAIL;
     }
@@ -44,7 +44,8 @@ static esp_err_t s_example_read_file(const char *path)
 {
     ESP_LOGI(WEBSERVER_TAG, "Reading file %s", path);
     FILE *f = fopen(path, "r");
-    if (f == NULL) {
+    if (f == NULL)
+    {
         ESP_LOGE(WEBSERVER_TAG, "Failed to open file for reading");
         return ESP_FAIL;
     }
@@ -54,7 +55,8 @@ static esp_err_t s_example_read_file(const char *path)
 
     // strip newline
     char *pos = strchr(line, '\n');
-    if (pos) {
+    if (pos)
+    {
         *pos = '\0';
     }
     ESP_LOGI(WEBSERVER_TAG, "Read from file: '%s'", line);
@@ -66,9 +68,14 @@ static esp_err_t s_example_read_file(const char *path)
 esp_err_t init_fs(void)
 {
     esp_err_t ret = esp_vfs_semihost_register(CONFIG_UMNI_WEB_MOUNT_POINT);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(WEBSERVER_TAG, "Failed to register semihost driver (%s)!", esp_err_to_name(ret));
         return ESP_FAIL;
+    }
+    else
+    {
+        ESP_LOGI(WEBSERVER_TAG, "Semihost register success");
     }
     return ESP_OK;
 }
@@ -81,17 +88,15 @@ esp_err_t init_fs(void)
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 5,
-        .allocation_unit_size = 16 * 1024
-    };
-    sdmmc_card_t* card;
+        .allocation_unit_size = 16 * 1024};
+    sdmmc_card_t *card;
 
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
 
-    slot_config.gpio_cs = GPIO_NUM_17;
+    slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
-    //ret = spi_bus_add_device(CONFIG_UMNI_ETH_SPI_HOST,  &buscfg, NULL);
-    ESP_ERROR_CHECK(esp_vfs_fat_sdspi_mount(CONFIG_UMNI_WEB_MOUNT_POINT, &host, &slot_config, &mount_config, &card));
+    ESP_ERROR_CHECK(esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card));
     sdmmc_card_print_info(stdout, card);
 
     return ESP_OK;
@@ -99,10 +104,17 @@ esp_err_t init_fs(void)
 
 #endif
 
-void webserver_start_task(void *args){
+void webserver_start_task(void *args)
+{
     // ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(init_fs());
-    //ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_WEB_MOUNT_POINT"/www"));
+// ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_SD_MOUNT_POINT CONFIG_UMNI_WEB_MOUNT_POINT));
+#if CONFIG_UMNI_WEB_DEPLOY_SD
+    ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_SD_MOUNT_POINT CONFIG_UMNI_WEB_MOUNT_POINT));
+#else if CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
+    ESP_ERROR_CHECK(start_rest_server("/www"));
+#endif
+    //   ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_WEB_MOUNT_POINT"/www"));
     vTaskDelete(NULL);
 }
 

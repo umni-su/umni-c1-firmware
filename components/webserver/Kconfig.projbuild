@@ -36,7 +36,7 @@ menu "UMNI Webserver"
         help
             Укажите точку монирования VFS.
             
-    config WEBSERVER_MAX_CLIENTS
+    config UMNI_WEB_MAX_CLIENTS
         int "Максимальное количество одновременных подключений"
         default 5
         help

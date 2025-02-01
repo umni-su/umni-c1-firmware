@@ -1,9 +1,3 @@
-
-typedef struct
-{
-    bool authenticated;
-} sess_ctx_t;
-
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
     do                                                                                 \
     {                                                                                  \
@@ -13,8 +7,8 @@ typedef struct
             goto goto_tag;                                                             \
         }                                                                              \
     } while (0)
-#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
-#define SCRATCH_BUFSIZE (10240)
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_FATFS_MAX_LFN)
+#define SCRATCH_BUFSIZE (4096)
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
 #define MDNS_INSTANCE "esp home web server"
