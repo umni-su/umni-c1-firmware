@@ -50,7 +50,7 @@ void app_main(void)
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
 
-    ESP_ERROR_CHECK(init_nvs());
+    ESP_ERROR_CHECK(um_nvs_init());
 
     ESP_ERROR_CHECK(init_do());
     ESP_ERROR_CHECK(init_di());

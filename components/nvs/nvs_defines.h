@@ -4,22 +4,30 @@
 #define NVS_WIFI_MODE_APSTA 3
 #define NVS_WIFI_MODE_DISABLED 4
 
-#define NVS_KEY_USERNAME "auth-username"
-#define NVS_KEY_PASSWORD "auth-password"
-#define NVS_KEY_TOKEN "auth-token"
+#define NVS_KEY_INSTALLED "inst"
+#define NVS_KEY_HOSTNAME "name"
+#define NVS_KEY_USERNAME "admusr"
+#define NVS_KEY_PASSWORD "admpwd"
 
-#define NVS_KEY_WIFI_MODE "wifi-mode"
-#define NVS_KEY_WIFI_AP_SSID "wifi-ap-ssid"
-#define NVS_KEY_WIFI_AP_PWD "wifi-ap-pwd"
-#define NVS_KEY_WIFI_AP_CHANNEL "wifi-ap-channel"
-#define NVS_KEY_WIFI_AP_MAX_CONNECTIONS "wifi-ap-max-con"
-#define NVS_KEY_WIFI_STA_SSID "wifi-sta-ssid"
-#define NVS_KEY_WIFI_STA_PWD "wifi-sta-pwd"
+/**
+ * Режим станции (ESP32 подключается к существующей сети WIFI)
+ */
+#define NVS_KEY_WIFI_STA_SSID "stname"
+#define NVS_KEY_WIFI_STA_PWD "stapwd"
 
-#define NVS_KEY_ETH_ENABLED "eth-enabled"
+/**
+ * Настройки wifi адаптера для режима STA
+ */
+#define NVS_KEY_WIFI_TYPE "wt"      // DHCP (1) or STATIC (2)
+#define NVS_KEY_WIFI_IP "wip"       // IP address
+#define NVS_KEY_WIFI_NETMASK "wnm"  // Netmask
+#define NVS_KEY_WIFI_GATEWAY "wgw"  // Gateway
+#define NVS_KEY_WIFI_NETMASK "wdns" // Empty for AUTO (use system)
 
-#define NVS_KEY_MCP23017 "dio-mcp"
+/**
+ * ETHERNET
+ */
 
-#define NVS_TYPE_STRING 1
-#define NVS_TYPE_INT8_T 2
-#define NVS_TYPE_UINT8_T 3
+/** MQTT */
+
+/** REST API */

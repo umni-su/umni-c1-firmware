@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <esp_system.h>
 #include <esp_log.h>
 #include "esp_http_server.h"
@@ -39,10 +40,15 @@ typedef struct rest_server_context
     char scratch[SCRATCH_BUFSIZE];
 } rest_server_context_t;
 
-typedef struct rest_server_sess
+int get_sockfd(httpd_req_t *req)
 {
-    uint8_t client_id;
-} rest_server_sess_t;
+    return httpd_req_to_sockfd(req);
+}
+
+bool check_auth()
+{
+    return authenticated;
+}
 
 /**
  *  Set HTTP response content type according to file extension
@@ -135,6 +141,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
         }
 
         strlcat(filepath, "/index.html", sizeof(filepath));
+        ESP_LOGI(REST_TAG, "SockFD is %d", get_sockfd(req));
     }
     else
     {
@@ -205,6 +212,22 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t adm_auth_ckeck(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    cJSON *response = cJSON_CreateObject();
+    bool success = check_auth();
+    bool installed = false;
+    cJSON_AddBoolToObject(response, "installed", installed); // is system installed or not
+    cJSON_AddBoolToObject(response, "success", success);     // authenticated or not
+
+    const char *json = cJSON_Print(response);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(response);
+    return ESP_OK;
+}
+
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
@@ -222,15 +245,24 @@ esp_err_t start_rest_server(const char *base_path)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.max_uri_handlers = 100;
-    // config.lru_purge_enable = true;
-    // config.max_open_sockets = MAX_CLIENTS + 2;
+    config.max_uri_handlers = 50;
+    config.lru_purge_enable = true;
+    config.max_open_sockets = MAX_CLIENTS + 2;
     //---config.global_user_ctx = keep_alive;
     // config.open_fn = ws_open_fd;
     //---config.close_fn = ws_close_fd;
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
+
+    /** AUTH **/
+    /* URI handler for auth ckeck */
+    httpd_uri_t adm_auth_ckeck_uri = {
+        .uri = "/adm/auth/check",
+        .method = HTTP_GET,
+        .handler = adm_auth_ckeck,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_auth_ckeck_uri);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {

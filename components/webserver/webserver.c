@@ -95,10 +95,10 @@ esp_err_t init_fs(void)
 
     slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    host.max_freq_khz = 10000; // пониженная частота для общения с SD SPI
     slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
     ESP_ERROR_CHECK(esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card));
     sdmmc_card_print_info(stdout, card);
-
     return ESP_OK;
 }
 
