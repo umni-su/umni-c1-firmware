@@ -8,7 +8,7 @@
         }                                                                              \
     } while (0)
 #define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_FATFS_MAX_LFN)
-#define SCRATCH_BUFSIZE (4096)
+#define SCRATCH_BUFSIZE (8192)
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
 #define MDNS_INSTANCE "esp home web server"

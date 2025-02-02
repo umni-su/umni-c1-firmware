@@ -24,6 +24,9 @@
 #include "cJSON.h"
 #include "webserver.h"
 
+#include "../nvs/nvs.h"
+#include "../../main/includes/events.h"
+
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
 static const char *REST_TAG = "esp-rest";
@@ -33,6 +36,8 @@ static bool authenticated = false;
 httpd_handle_t server = NULL;
 
 uint8_t client_ids[MAX_CLIENTS] = {0};
+
+static bool installed = false;
 
 typedef struct rest_server_context
 {
@@ -141,7 +146,6 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
         }
 
         strlcat(filepath, "/index.html", sizeof(filepath));
-        ESP_LOGI(REST_TAG, "SockFD is %d", get_sockfd(req));
     }
     else
     {
@@ -149,7 +153,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
         char *token = strtok(filepath, "?");
         if (token != NULL)
         {
-            printf(" %s\n", token);
+            // printf(" %s\n", token);
         }
     }
     int fd = open(filepath, O_RDONLY, 0);
@@ -217,9 +221,99 @@ static esp_err_t adm_auth_ckeck(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     cJSON *response = cJSON_CreateObject();
     bool success = check_auth();
-    bool installed = false;
     cJSON_AddBoolToObject(response, "installed", installed); // is system installed or not
     cJSON_AddBoolToObject(response, "success", success);     // authenticated or not
+
+    const char *json = cJSON_Print(response);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(response);
+    return ESP_OK;
+}
+
+static esp_err_t adm_install(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    cJSON *response = cJSON_CreateObject();
+    char *buf = prepare_post_buffer(req);
+    bool success = false;
+    if (buf != NULL)
+    {
+        cJSON *post = cJSON_Parse(buf);
+        char *username = cJSON_GetObjectItem(post, "u")->valuestring;
+        char *password = cJSON_GetObjectItem(post, "p")->valuestring;
+        char *passwordRepeat = cJSON_GetObjectItem(post, "pr")->valuestring;
+        if (strcmp(password, passwordRepeat) == 0)
+        {
+            // Save admin creds
+            um_nvs_write_str(NVS_KEY_USERNAME, username);
+            um_nvs_write_str(NVS_KEY_PASSWORD, password);
+            // Set installed = true
+            um_nvs_write_i8(NVS_KEY_INSTALLED, 1);
+            // Fire event to start services!
+            installed = true;
+            esp_event_post(APP_EVENTS, EV_SYSTEM_INSTALLED, NULL, sizeof(NULL), portMAX_DELAY);
+
+            success = true;
+        }
+        cJSON_Delete(post);
+    }
+    cJSON_AddBoolToObject(response, "success", success);
+
+    const char *json = cJSON_Print(response);
+
+    // httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_sendstr(req, json);
+
+    cJSON_Delete(response);
+    free((void *)json);
+
+    return ESP_OK;
+}
+
+static esp_err_t adm_auth_login(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    cJSON *response = cJSON_CreateObject();
+    char *buf = prepare_post_buffer(req);
+    bool success = false;
+    if (buf != NULL)
+    {
+        cJSON *post = cJSON_Parse(buf);
+        char *username = cJSON_GetObjectItem(post, "u")->valuestring;
+        char *password = cJSON_GetObjectItem(post, "p")->valuestring;
+        char *nvs_username = um_nvs_read_str(NVS_KEY_USERNAME);
+        char *nvs_password = um_nvs_read_str(NVS_KEY_USERNAME);
+        if (strcmp(password, nvs_password) == 0 && strcmp(username, nvs_username) == 0)
+        {
+            authenticated = true;
+            success = true;
+        }
+        cJSON_Delete(post);
+    }
+    cJSON_AddBoolToObject(response, "installed", installed);
+    cJSON_AddBoolToObject(response, "success", success);
+
+    const char *json = cJSON_Print(response);
+
+    // httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_sendstr(req, json);
+
+    cJSON_Delete(response);
+    free((void *)json);
+
+    return ESP_OK;
+}
+
+static esp_err_t adm_auth_logout(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+
+    authenticated = false;
+
+    cJSON *response = cJSON_CreateObject();
+    bool success = true;
+    cJSON_AddBoolToObject(response, "success", success); // authenticated or not
 
     const char *json = cJSON_Print(response);
     httpd_resp_sendstr(req, json);
@@ -238,6 +332,7 @@ void free_ctx_func(void *ctx)
 esp_err_t start_rest_server(const char *base_path)
 {
     authenticated = false;
+    installed = um_nvs_is_installed();
     REST_CHECK(base_path, "wrong base path", err);
     rest_server_context_t *rest_context = calloc(1, sizeof(rest_server_context_t));
     REST_CHECK(rest_context, "No memory for rest context", err);
@@ -256,13 +351,37 @@ esp_err_t start_rest_server(const char *base_path)
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
     /** AUTH **/
-    /* URI handler for auth ckeck */
+    // Check auth
     httpd_uri_t adm_auth_ckeck_uri = {
         .uri = "/adm/auth/check",
         .method = HTTP_GET,
         .handler = adm_auth_ckeck,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_auth_ckeck_uri);
+
+    // Login
+    httpd_uri_t adm_auth_login_url = {
+        .uri = "/adm/auth/login",
+        .method = HTTP_POST,
+        .handler = adm_auth_login,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_auth_login_url);
+
+    // Logout
+    httpd_uri_t adm_auth_logout_url = {
+        .uri = "/adm/auth/logout",
+        .method = HTTP_GET,
+        .handler = adm_auth_logout,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_auth_logout_url);
+
+    // Install ap
+    httpd_uri_t install_uri = {
+        .uri = "/adm/install",
+        .method = HTTP_POST,
+        .handler = adm_install,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &install_uri);
 
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {

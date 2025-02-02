@@ -21,7 +21,10 @@ extern "C"
         EV_WIFI_MODE_UPDATED,
         EV_NVS_WIFI_INIT_ON_STARTUP,
         EV_SPIFFS_READY,
-        EV_DO_INIT
+        EV_NVS_OPENED,
+        EV_DO_INIT,
+        EV_SYSTEM_INSTALLED,
+        EV_NTP_SYNC_SUCCESS
     };
 
 #ifdef __cplusplus

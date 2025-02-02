@@ -1,4 +1,4 @@
-#include "../events/event_types.h" // must be before esp_event.h
+#include "../../main/includes/events.h" // must be before esp_event.h
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "esp_log.h"
@@ -23,7 +23,17 @@ esp_err_t um_nvs_init()
     {
         ESP_LOGE(NVS_TAG, "Fail initialize NVS srorage with code: %s", esp_err_to_name(err));
     }
-    ESP_ERROR_CHECK(err);
+    // ESP_ERROR_CHECK(err);
+    if (um_nvs_open(NVS_NAMESPACE))
+    {
+        err = ESP_OK;
+        esp_event_post(APP_EVENTS, EV_NVS_OPENED, NULL, sizeof(NULL), portMAX_DELAY);
+    }
+    else
+    {
+        err = ESP_FAIL;
+        ESP_LOGE(NVS_TAG, "NVS initialized, but um_nvs_open faled. application can not run...");
+    }
     return err;
 }
 
@@ -43,9 +53,38 @@ bool um_nvs_open(char *namespace)
         ESP_LOGI(NVS_TAG, "=================");
         ESP_LOGI(NVS_TAG, "Opening Non-Volatile Storage (NVS) handle OK ");
         ESP_LOGI(NVS_TAG, "=================");
+        if (!um_nvs_is_installed())
+        {
+            um_nvs_erase();
+            um_nvs_initialize_with_basic();
+            ESP_LOGI(NVS_TAG, "Erase NVS storage, case application is not installed.");
+        }
+        else
+        {
+            // System is installed, send event
+            esp_event_post(APP_EVENTS, EV_SYSTEM_INSTALLED, NULL, sizeof(NULL), portMAX_DELAY);
+        }
         return true;
     }
     return false;
+}
+
+esp_err_t um_nvs_initialize_with_basic()
+{
+    esp_err_t res = ESP_FAIL;
+    res = um_nvs_write_i8(NVS_KEY_ETH_TYPE, UM_IP_TYPE_DHCP);           // Set ETHERNET to DHCP
+    res = um_nvs_write_i8(NVS_KEY_WIFI_TYPE, UM_IP_TYPE_DHCP);          // Set WIFI STA to DHCP
+    res = um_nvs_write_i8(NVS_KEY_UPDATES_CHANNEL, UM_UPD_CHAN_STABLE); // Updates channel STABLE
+    res = um_nvs_write_str(NVS_KEY_HOSTNAME, CONFIG_UMNI_NVS_HOSTNAME); // Hostname
+    res = um_nvs_write_str(NVS_KEY_NTP, CONFIG_UMNI_NVS_NTP_DEFAULT);   // NTP server
+
+    res = um_nvs_write_i8(NVS_KEY_OT_ENABLED, 1); // Enable OPENTERM as default
+    res = um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, 55);
+    res = um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, 45);
+
+    res = um_nvs_write_i8(NVS_KEY_RELAYS, 0xff); // Default relays state is OFF (high level on PCF)
+
+    return res;
 }
 
 /**
@@ -113,7 +152,7 @@ int64_t um_nvs_read_i64(char *key)
 }
 
 /**
- * [read_nvs_str description]
+ * [um_nvs_read_str description]
  *
  * @param   char  key   [key description]
  * @param   int   type  [type description]
@@ -191,22 +230,33 @@ esp_err_t um_nvs_write_value_i64(char *key, int64_t value)
 
 char *um_nvs_get_wifi_sta_ssid()
 {
-    return read_nvs_str(NVS_KEY_WIFI_STA_SSID);
+    return um_nvs_read_str(NVS_KEY_WIFI_STA_SSID);
 }
 
 bool um_nvs_set_wifi_sta_ssid(char *sta_ssid)
 {
-    return write_nvs_value_str(NVS_KEY_WIFI_STA_SSID, sta_ssid);
+    return um_nvs_write_str(NVS_KEY_WIFI_STA_SSID, sta_ssid);
 }
 
 char *um_nvs_get_wifi_sta_pwd()
 {
-    return read_nvs_str(NVS_KEY_WIFI_STA_PWD);
+    return um_nvs_read_str(NVS_KEY_WIFI_STA_PWD);
 }
 
 bool um_nvs_set_wifi_sta_pwd(char *sta_pwd)
 {
-    return write_nvs_value_str(NVS_KEY_WIFI_STA_PWD, sta_pwd);
+    return um_nvs_write_str(NVS_KEY_WIFI_STA_PWD, sta_pwd);
+}
+
+/**
+ * Ckeck application installed state
+ */
+bool um_nvs_is_installed()
+{
+    bool inst = um_nvs_read_i8(NVS_KEY_INSTALLED) == 1;
+    char *username = um_nvs_read_str(NVS_KEY_USERNAME);
+    char *password = um_nvs_read_str(NVS_KEY_PASSWORD);
+    return inst && username != NULL && password != NULL;
 }
 
 /**

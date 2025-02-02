@@ -70,3 +70,7 @@ esp_err_t do_register_events();
 esp_err_t init_di();
 
 void di_interrupt_task(void *arg);
+
+uint8_t di_get_nvs_state();
+
+esp_err_t di_set_nvs_state();

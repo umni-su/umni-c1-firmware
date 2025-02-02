@@ -1,6 +1,8 @@
 #include "dio.h"
-#include "../../main/includes/events.h"
 #include "esp_event.h"
+
+#include "../../main/includes/events.h"
+#include "../nvs/nvs.h"
 
 uint8_t input_data = 0xff;
 
@@ -20,9 +22,25 @@ esp_err_t do_register_events()
     // return esp_event_handler_register(APP_EVENTS, S_CONFIG_SPIFFS_READY, &config_spiffs_mounted, NULL);
 }
 
+uint8_t di_get_nvs_state()
+{
+    int8_t state = um_nvs_read_i8(NVS_KEY_RELAYS);
+    if ((int)state == -1)
+    {
+        state = 0xff;
+    }
+    return (uint8_t)state;
+}
+
+esp_err_t di_set_nvs_state()
+{
+    return um_nvs_write_i8(NVS_KEY_RELAYS, output_data);
+}
+
 esp_err_t init_do()
 {
     esp_err_t res = ESP_OK;
+    output_data = di_get_nvs_state();
     memset(&pcf8574_output_dev_t, 0, sizeof(i2c_dev_t));
     pcf8574_output_dev_t.cfg.master.clk_speed = 5000; // Hz
     res = pcf8574_init_desc(&pcf8574_output_dev_t, I2C_DO_ADDR, 0, CONFIG_UMNI_I2C_SDA, CONFIG_UMNI_I2C_SCL);
@@ -65,7 +83,17 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
         output_data = output_data & ~(1 << channel);
     }
     // output_data = output_data >> channel & level;
-    return pcf8574_port_write(&pcf8574_output_dev_t, output_data);
+    esp_err_t res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
+    if (res == ESP_OK)
+    {
+        res = di_set_nvs_state();
+        ESP_LOGW("DO STATE", "%u", di_get_nvs_state());
+    }
+    if (res != ESP_OK)
+    {
+        ESP_LOGE("dio", "do_set_level error %s", esp_err_to_name(res));
+    }
+    return res;
 }
 
 /// @brief Задача обработки мигания системных светодиодов

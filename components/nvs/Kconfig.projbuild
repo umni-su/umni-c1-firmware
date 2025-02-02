@@ -1,0 +1,15 @@
+menu "UMNI NVS"
+
+    config UMNI_NVS_HOSTNAME
+        string "Имя хоста"
+        default "umni-c-one.local"
+        help
+            Укажите имя хоста (используется для MDNS, NETIF служб).
+            
+    config UMNI_NVS_NTP_DEFAULT
+        string "Адрес сервера времени"
+        default "0.ru.pool.ntp.org"
+        help
+            Укажите адрес NTP сервера для синхронихации времени
+
+endmenu

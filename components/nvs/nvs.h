@@ -2,10 +2,12 @@
 
 typedef struct
 {
-    char *inst;
+    int inst;
     char *hane;
     char *admuser;
-    char *admpwd
+    char *admpwd;
+    char *ntp;
+    char *tz;
 } umni_nvs_app_t;
 
 typedef struct
@@ -22,8 +24,19 @@ typedef struct
 
 typedef struct
 {
-    /* data */
-} umni_nvs_eth_t;
+    int et;
+    char *eip;
+    char *enm;
+    char *egw;
+    char *edns;
+
+} um_nvs_eth_t;
+
+typedef struct
+{
+    int otdhwsp;
+    int ottbsp;
+} umni_nvs_ot_t;
 
 /**
  * Init nvs
@@ -38,6 +51,11 @@ esp_err_t um_nvs_init();
  * @return  bool             [return description]
  */
 bool um_nvs_open(char *namespace);
+
+/**
+ * Initialize NVS with basic values
+ */
+esp_err_t um_nvs_initialize_with_basic();
 
 /**
  * [read_nvs_i8 description]
@@ -76,7 +94,7 @@ esp_err_t um_nvs_write_u16(char *key, uint16_t value);
 int64_t um_nvs_read_i64(char *key);
 
 /**
- * [read_nvs_str description]
+ * [um_nvs_read_str description]
  *
  * @param   char  key  [key description]
  *
@@ -85,7 +103,7 @@ int64_t um_nvs_read_i64(char *key);
 char *um_nvs_read_str(char *key);
 
 /**
- * [write_nvs_value_str description]
+ * [um_nvs_write_str description]
  *
  * @param   char  key    [key description]
  * @param   char  value  [value description]
@@ -113,6 +131,21 @@ esp_err_t um_nvs_write_i8(char *key, int8_t value);
 esp_err_t um_nvs_write_value_i64(char *key, int64_t value);
 
 /**
+ * Delete nvs value by key
+ */
+bool um_nvs_delete_key(char *key);
+
+/**
+ * Erease all dat in nvs
+ */
+bool um_nvs_erase();
+
+/**
+ * Close nvs
+ */
+void um_nvs_close();
+
+/**
  * Get wifi sta ssid
  */
 char *um_nvs_get_wifi_sta_ssid();
@@ -130,17 +163,4 @@ char *um_nvs_get_wifi_sta_pwd();
  */
 bool um_nvs_set_wifi_sta_pwd(char *sta_pwd);
 
-/**
- * Erease all dat in nvs
- */
-bool um_nvs_erase();
-
-/**
- * Delete nvs value by key
- */
-bool um_nvs_delete_key(char *key);
-
-/**
- * Close nvs
- */
-void um_nvs_close();
+bool um_nvs_is_installed();

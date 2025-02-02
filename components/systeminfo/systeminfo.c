@@ -1,0 +1,105 @@
+#include <stdio.h>
+#include <time.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "../nvs/nvs.h"
+#include "esp_netif_sntp.h"
+#include "esp_sntp.h"
+#include "esp_event.h"
+#include "../../main/includes/events.h"
+#include "esp_chip_info.h"
+
+#include "systeminfo.h"
+
+const char *TAG = "systeminfo";
+const char *ntp_host;
+
+time_t now;
+char strftime_buf[64];
+struct tm timeinfo;
+
+TaskHandle_t systeminfo_task_handle = NULL;
+
+static void shutdown_handler()
+{
+    um_nvs_write_str(NVS_KEY_RESET_AT, strftime_buf);
+}
+
+void um_systeminfo_task(void *arg)
+{
+    um_systeminfo_get_date();
+    esp_event_post(APP_EVENTS, EV_NTP_SYNC_SUCCESS, (void *)strftime_buf, sizeof(strftime_buf), portMAX_DELAY);
+    vTaskDelete(systeminfo_task_handle);
+}
+
+void time_sync_notification_cb(struct timeval *tv)
+{
+    xTaskCreatePinnedToCore(um_systeminfo_task, "systeminfo", 4095, NULL, 10, &systeminfo_task_handle, 1);
+
+    ESP_LOGW(TAG, "Notification of a time synchronization event");
+}
+
+void um_systeminfo_init_sntp()
+{
+    ntp_host = um_nvs_read_str(NVS_KEY_NTP);
+
+    // configure the event on which we renew servers
+    setenv("TZ", "MSK-3", 1);
+    tzset();
+
+    if (ntp_host != NULL)
+    {
+        esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(ntp_host);
+        config.start = false;                     // start SNTP service explicitly (after connecting)
+        config.server_from_dhcp = false;          // accept NTP offers from DHCP server, if any (need to enable *before* connecting)
+        config.renew_servers_after_new_IP = true; // let esp-netif update configured SNTP server(s) after receiving DHCP lease
+        config.index_of_first_server = 0;         // updates from server num 1, leaving server 0 (from DHCP) intact
+        config.ip_event_to_renew = IP_EVENT_STA_GOT_IP | IP_EVENT_ETH_GOT_IP;
+        config.sync_cb = time_sync_notification_cb;
+        // esp_sntp_setservername(0, ntp_host);
+        esp_netif_sntp_init(&config);
+        esp_netif_sntp_start();
+    }
+}
+
+void um_systeminfo_update_date()
+{
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%x %X", &timeinfo);
+}
+
+char *um_systeminfo_get_date()
+{
+    um_systeminfo_update_date();
+    return strftime_buf;
+}
+
+void um_systeminfo_init()
+{
+    um_nvs_write_str(NVS_KEY_POWERON_AT, strftime_buf);
+    esp_register_shutdown_handler(shutdown_handler);
+    um_systeminfo_init_sntp();
+}
+
+um_systeminfo_data_type_t um_systeminfo_get_struct_data()
+{
+    esp_chip_info_t info;
+    esp_chip_info(&info);
+    um_systeminfo_data_type_t data = {
+        .date = strftime_buf,
+        .last_reset = um_nvs_read_str(NVS_KEY_RESET_AT),
+        .uptime = um_nvs_read_str(NVS_KEY_POWERON_AT),
+        .restart_reason = esp_reset_reason(),
+        .free_heap = esp_get_free_heap_size(),
+        .chip = (int)info.revision,
+        .cores = (int)info.cores,
+        .model = (int)info.model,
+        .idf_ver = IDF_VER,
+        .fw_ver = IDF_VER};
+
+    return data;
+}
