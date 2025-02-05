@@ -24,8 +24,9 @@
 #include "cJSON.h"
 #include "webserver.h"
 
-#include "../nvs/nvs.h"
 #include "../../main/includes/events.h"
+#include "../nvs/nvs.h"
+#include "../systeminfo/systeminfo.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
@@ -194,7 +195,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
     } while (read_bytes > 0);
     /* Close file after sending complete */
     close(fd);
-    ESP_LOGI(REST_TAG, "File sending complete");
+    // ESP_LOGI(REST_TAG, "File sending complete");
     /* Respond with an empty chunk to signal HTTP response completion */
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -203,16 +204,41 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
 /* Simple handler for getting system handler */
 static esp_err_t system_info_get_handler(httpd_req_t *req)
 {
+    ESP_LOGI(REST_TAG, "Free heap size before: %ld", esp_get_free_heap_size());
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    esp_chip_info_t chip_info;
-    esp_chip_info(&chip_info);
-    cJSON_AddStringToObject(root, "version", IDF_VER);
-    cJSON_AddNumberToObject(root, "cores", chip_info.cores);
+
+    um_systeminfo_data_type_t info = um_systeminfo_get_struct_data();
+    cJSON_AddStringToObject(root, "date", info.date);
+    cJSON_AddStringToObject(root, "last_reset", info.last_reset);
+    cJSON_AddNumberToObject(root, "reset_reason", (int)info.restart_reason);
+    cJSON_AddNumberToObject(root, "uptime", (int)info.uptime);
+    cJSON_AddNumberToObject(root, "free_heap", info.free_heap);
+    cJSON_AddNumberToObject(root, "total_heap", info.total_heap);
+    cJSON_AddStringToObject(root, "fw_ver", info.fw_ver);
+    cJSON_AddStringToObject(root, "fw_ver_web", info.fw_ver_web);
+    cJSON_AddNumberToObject(root, "chip", info.chip);
+    cJSON_AddNumberToObject(root, "cores", info.cores);
+    cJSON_AddNumberToObject(root, "revision", info.model);
+
+    // Netif
+    cJSON *netif = cJSON_CreateArray();
+    // ETHERNET
+    cJSON *eth = cJSON_CreateObject();
+    cJSON_AddStringToObject(eth, "name", info.ip_eth_info.name);
+    cJSON_AddStringToObject(eth, "mac", info.ip_eth_info.mac);
+    cJSON_AddStringToObject(eth, "ip", info.ip_eth_info.ip);
+    cJSON_AddStringToObject(eth, "mask", info.ip_eth_info.mask);
+    cJSON_AddStringToObject(eth, "gw", info.ip_eth_info.gw);
+
+    cJSON_AddItemToArray(netif, eth);
+    cJSON_AddItemToObject(root, "netif", netif);
+
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    free((void *)sys_info);
     cJSON_Delete(root);
+    free((void *)sys_info);
+    ESP_LOGI(REST_TAG, "Free heap size after: %ld", esp_get_free_heap_size());
     return ESP_OK;
 }
 
@@ -283,7 +309,7 @@ static esp_err_t adm_auth_login(httpd_req_t *req)
         char *username = cJSON_GetObjectItem(post, "u")->valuestring;
         char *password = cJSON_GetObjectItem(post, "p")->valuestring;
         char *nvs_username = um_nvs_read_str(NVS_KEY_USERNAME);
-        char *nvs_password = um_nvs_read_str(NVS_KEY_USERNAME);
+        char *nvs_password = um_nvs_read_str(NVS_KEY_PASSWORD);
         if (strcmp(password, nvs_password) == 0 && strcmp(username, nvs_username) == 0)
         {
             authenticated = true;
@@ -319,6 +345,12 @@ static esp_err_t adm_auth_logout(httpd_req_t *req)
     httpd_resp_sendstr(req, json);
     free((void *)json);
     cJSON_Delete(response);
+    return ESP_OK;
+}
+
+static esp_err_t adm_st_dio(httpd_req_t *req)
+{
+    ///...
     return ESP_OK;
 }
 
@@ -383,13 +415,22 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &install_uri);
 
+    /** STATES**/
     /* URI handler for fetching system info */
     httpd_uri_t system_info_get_uri = {
-        .uri = "/api/v1/system/info",
+        .uri = "/adm/st/info",
         .method = HTTP_GET,
         .handler = system_info_get_handler,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    // DIO get
+    httpd_uri_t adm_st_dio_uri = {
+        .uri = "/adm/st/dio",
+        .method = HTTP_GET,
+        .handler = adm_st_dio,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_dio_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

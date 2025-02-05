@@ -242,10 +242,6 @@ void di_interrupt_task(void *arg)
             ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
             input_data = current_state; // set last level to input pins
         }
-        // else
-        // {
-
-        //}
     }
     vTaskDelete(NULL);
 }

@@ -17,6 +17,7 @@
 #include "../components/dio/dio.h"
 #include "../components/1wire/1wire.h"
 #include "../components/systeminfo/systeminfo.h"
+#include "../components/config/config.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 
@@ -31,6 +32,8 @@ static i2c_dev_t pcf8574_inp;
 static TaskHandle_t do_handle;
 static TaskHandle_t di_handle;
 
+bool webserver_started = false;
+
 void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
     if ((int)id != 6)
@@ -38,22 +41,21 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
         switch (id)
         {
-        case EV_NVS_OPENED:
-            ethernet_start();
-            vTaskDelay(pdMS_TO_TICKS(200));
-
+        case EV_SDCARD_MOUNTED:
+            um_config_init();
             webserver_start();
-            vTaskDelay(pdMS_TO_TICKS(200));
             // Инициализируем входы при инициализации NVS
             // чтобы обеспечить необходимый уровень при включении
             ESP_ERROR_CHECK(init_do());
+            ESP_ERROR_CHECK(init_di());
+            break;
+        case EV_NVS_OPENED:
+            ethernet_start();
 
             break;
         case EV_SYSTEM_INSTALLED:
 
             um_systeminfo_init();
-
-            ESP_ERROR_CHECK(init_di());
 
             init_opentherm();
 
@@ -67,6 +69,22 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             ESP_LOGI(TAG, "The current date/time in Moscow is: %s", (char *)event_data);
             break;
 
+        case EV_ETH_MAC:
+            char *mac = (char *)event_data;
+            ESP_LOGI(TAG, "Save ETH MAC to NVS %s", mac);
+            um_nvs_write_str(NVS_KEY_ETH_MAC, mac);
+            break;
+        case EV_ETH_GOT_IP:
+            //
+            break;
+        case IP_EVENT_ETH_GOT_IP:
+        case IP_EVENT_STA_GOT_IP:
+            // Start webserver ONCE
+            if (!webserver_started)
+            {
+                webserver_started = true;
+            }
+            break;
         default:
             break;
         }
@@ -79,7 +97,6 @@ void app_main(void)
     ESP_LOGI(TAG, "!Starting load UMNI firmware!");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_any_event, NULL));
-
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(gpio_install_isr_service(0));

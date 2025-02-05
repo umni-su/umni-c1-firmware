@@ -35,6 +35,8 @@ extern "C"
 
     void ethernet_start();
 
+    esp_err_t init_fs(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -5,13 +5,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
-#include "../nvs/nvs.h"
+#include "esp_mac.h"
+#include "esp_timer.h"
 #include "esp_netif_sntp.h"
 #include "esp_sntp.h"
 #include "esp_event.h"
-#include "../../main/includes/events.h"
 #include "esp_chip_info.h"
 
+#include "../config.h"
+#include "../nvs/nvs.h"
+#include "../../main/includes/events.h"
 #include "systeminfo.h"
 
 const char *TAG = "systeminfo";
@@ -23,9 +26,38 @@ struct tm timeinfo;
 
 TaskHandle_t systeminfo_task_handle = NULL;
 
+um_netif_data_type_t eth_ip_info;
+
 static void shutdown_handler()
 {
-    um_nvs_write_str(NVS_KEY_RESET_AT, strftime_buf);
+    um_nvs_write_str(NVS_KEY_RESET_AT, um_systeminfo_get_date());
+}
+
+/** Event handler for IP_EVENT_ETH_GOT_IP */
+static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
+                                 int32_t event_id, void *event_data)
+{
+    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+    const esp_netif_ip_info_t *ip_info = &event->ip_info;
+
+    static char _ip[16];
+    static char _mask[16];
+    static char _gw[16];
+    char *_mac = um_nvs_read_str(NVS_KEY_ETH_MAC);
+
+    sprintf(_ip, "%d.%d.%d.%d", IP2STR(&ip_info->ip));
+    sprintf(_mask, "%d.%d.%d.%d", IP2STR(&ip_info->netmask));
+    sprintf(_gw, "%d.%d.%d.%d", IP2STR(&ip_info->gw));
+
+    ESP_LOGI(TAG, "================");
+    ESP_LOGI(TAG, "Ethernet Got IP Address");
+    ESP_LOGI(TAG, "IP:%s MASK:%s GW:%s MAC%s", _ip, _mask, _gw, _mac);
+    ESP_LOGI(TAG, "================");
+    eth_ip_info.name = "Ethernet";
+    eth_ip_info.ip = _ip;
+    eth_ip_info.mask = _mask;
+    eth_ip_info.gw = _gw;
+    eth_ip_info.mac = _mac;
 }
 
 void um_systeminfo_task(void *arg)
@@ -40,6 +72,7 @@ void time_sync_notification_cb(struct timeval *tv)
     xTaskCreatePinnedToCore(um_systeminfo_task, "systeminfo", 4095, NULL, 10, &systeminfo_task_handle, 1);
 
     ESP_LOGW(TAG, "Notification of a time synchronization event");
+    um_nvs_write_str(NVS_KEY_RESET_AT, um_systeminfo_get_date());
 }
 
 void um_systeminfo_init_sntp()
@@ -83,6 +116,7 @@ void um_systeminfo_init()
     um_nvs_write_str(NVS_KEY_POWERON_AT, strftime_buf);
     esp_register_shutdown_handler(shutdown_handler);
     um_systeminfo_init_sntp();
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 }
 
 um_systeminfo_data_type_t um_systeminfo_get_struct_data()
@@ -92,14 +126,22 @@ um_systeminfo_data_type_t um_systeminfo_get_struct_data()
     um_systeminfo_data_type_t data = {
         .date = strftime_buf,
         .last_reset = um_nvs_read_str(NVS_KEY_RESET_AT),
-        .uptime = um_nvs_read_str(NVS_KEY_POWERON_AT),
+        .uptime = esp_timer_get_time(),
         .restart_reason = esp_reset_reason(),
         .free_heap = esp_get_free_heap_size(),
+        .total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT),
         .chip = (int)info.revision,
         .cores = (int)info.cores,
         .model = (int)info.model,
         .idf_ver = IDF_VER,
-        .fw_ver = IDF_VER};
+        .fw_ver = FW_VER,
+        .fw_ver_web = FW_VER_WEB,
+        .ip_eth_info = {
+            .name = eth_ip_info.name,
+            .ip = eth_ip_info.ip,
+            .mask = eth_ip_info.mask,
+            .gw = eth_ip_info.gw,
+            .mac = eth_ip_info.mac}};
 
     return data;
 }

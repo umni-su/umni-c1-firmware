@@ -13,11 +13,7 @@
 
 #define MDNS_INSTANCE "esp home web server"
 
-esp_err_t init_fs(void);
-
 esp_err_t start_rest_server(const char *base_path);
-
-esp_err_t init_fs(void);
 
 void webserver_start_task(void *args);
 

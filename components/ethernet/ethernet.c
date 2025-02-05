@@ -15,6 +15,13 @@
 
 #endif // CONFIG_ETH_USE_SPI_ETHERNET
 
+#include "esp_vfs_fat.h"
+
+#if SOC_SDMMC_HOST_SUPPORTED
+#include "driver/sdmmc_host.h"
+#endif
+#include "sdmmc_cmd.h"
+
 #include "ethernet.h"
 
 static const char *TAG = "eth_init";
@@ -133,6 +140,8 @@ err:
 static esp_err_t spi_bus_init(void)
 {
     esp_err_t ret = ESP_OK;
+
+    gpio_pullup_dis(CONFIG_UMNI_ETH_SPI_CS0_GPIO); // add this to tests
 
     // Init SPI bus
     spi_bus_config_t buscfg = {
@@ -255,6 +264,7 @@ esp_err_t ethernet_init(esp_eth_handle_t *eth_handles_out[], uint8_t *eth_cnt_ou
 
 #if CONFIG_UMNI_USE_SPI_ETHERNET
     ESP_GOTO_ON_ERROR(spi_bus_init(), err, TAG, "SPI bus init failed");
+    ESP_GOTO_ON_ERROR(init_fs(), err, TAG, "Init fs failed");
     // Init specific SPI Ethernet module configuration from Kconfig (CS GPIO, Interrupt GPIO, etc.)
     spi_eth_module_config_t spi_eth_module_config[CONFIG_UMNI_SPI_ETHERNETS_NUM] = {0};
     INIT_SPI_ETH_MODULE_CONFIG(spi_eth_module_config, 0);
@@ -315,15 +325,13 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 
-        char mac_addr_str[12];
-        char buff[12];
-        for (int i = 0; i < 6; i++)
-        {
-            strcat(mac_addr_str, itoa(mac_addr[i], buff, 16));
-        }
-        ESP_LOGI(TAG, "Eth mac %s", mac_addr_str);
+        char mac_addr_str[18];
+        sprintf(
+            mac_addr_str,
+            "%02x:%02x:%02x:%02x:%02x:%02x",
+            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 
-        esp_event_post(APP_EVENTS, EV_ETH_START, mac_addr, sizeof(mac_addr), portMAX_DELAY);
+        esp_event_post(APP_EVENTS, EV_ETH_MAC, mac_addr_str, sizeof(mac_addr_str), portMAX_DELAY);
 
         break;
     case ETHERNET_EVENT_DISCONNECTED:
@@ -339,21 +347,6 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
     default:
         break;
     }
-}
-
-/** Event handler for IP_EVENT_ETH_GOT_IP */
-static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
-                                 int32_t event_id, void *event_data)
-{
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    const esp_netif_ip_info_t *ip_info = &event->ip_info;
-
-    ESP_LOGI(TAG, "================");
-    ESP_LOGI(TAG, "Ethernet Got IP Address");
-    ESP_LOGI(TAG, "ETHIP:" IPSTR, IP2STR(&ip_info->ip));
-    ESP_LOGI(TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    ESP_LOGI(TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
-    ESP_LOGI(TAG, "================");
 }
 
 void ethernet_task(void *pvParameters)
@@ -403,7 +396,6 @@ void ethernet_task(void *pvParameters)
 
     // Register user defined event handers
     ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 
     // Start Ethernet driver state machine
     for (int i = 0; i < eth_port_cnt; i++)
@@ -418,3 +410,44 @@ void ethernet_start()
 {
     xTaskCreatePinnedToCore(ethernet_task, "init_ethernet", 4095, NULL, 13, &ethernet_handle, 0);
 }
+
+#if CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
+esp_err_t init_fs(void)
+{
+    esp_err_t ret = esp_vfs_semihost_register(CONFIG_UMNI_WEB_MOUNT_POINT);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(WEBSERVER_TAG, "Failed to register semihost driver (%s)!", esp_err_to_name(ret));
+        return ESP_FAIL;
+    }
+    else
+    {
+        ESP_LOGI(WEBSERVER_TAG, "Semihost register success");
+    }
+    return ESP_OK;
+}
+#endif
+
+#if CONFIG_UMNI_WEB_DEPLOY_SD
+
+esp_err_t init_fs(void)
+{
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 5,
+        .allocation_unit_size = 16 * 1024};
+    sdmmc_card_t *card;
+
+    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+
+    slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
+    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+    host.max_freq_khz = 12 * 1000; // пониженная частота для общения с SD SPI
+    slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
+    ESP_ERROR_CHECK(esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card));
+    sdmmc_card_print_info(stdout, card);
+    esp_event_post(APP_EVENTS, EV_SDCARD_MOUNTED, NULL, sizeof(NULL), portMAX_DELAY);
+    return ESP_OK;
+}
+
+#endif

@@ -128,7 +128,7 @@ void onewire_uint64_t_to_addr_str(onewire_addr_t address, char *out)
     // https: // stackoverflow.com/questions/8323159/how-to-convert-uint64-t-value-in-const-char-string
     //  length of 2**64 - 1, +1 for nul.
     // char string_number[21];
-    sprintf(out, "%08llx", (uint64_t)address);
+    // sprintf(out, "%08llx", (uint64_t)address);
 }
 
 esp_err_t ds18x20_read_temp(onewire_addr_t address, float *temp)

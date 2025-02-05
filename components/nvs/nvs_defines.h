@@ -13,12 +13,14 @@
 /**
  * Режим станции (ESP32 подключается к существующей сети WIFI)
  */
+#define NVS_KEY_WIFI_STA_MAC "stmac"
 #define NVS_KEY_WIFI_STA_SSID "stname"
-#define NVS_KEY_WIFI_STA_PWD "stapwd"
+#define NVS_KEY_WIFI_STA_PWD "stpwd"
 
 /**
  * Настройки wifi адаптера для режима STA
  */
+#define NVS_KEY_WIFI_MAC "wmac"
 #define NVS_KEY_WIFI_TYPE "wt"     // Disable (NONE or 0) DHCP (1) or STATIC (2)
 #define NVS_KEY_WIFI_IP "wip"      // IP address
 #define NVS_KEY_WIFI_NETMASK "wnm" // Netmask
@@ -28,6 +30,7 @@
 /**
  * ETHERNET
  */
+#define NVS_KEY_ETH_MAC "emac"    // DHCP (1) or STATIC (2)
 #define NVS_KEY_ETH_TYPE "et"     // DHCP (1) or STATIC (2)
 #define NVS_KEY_ETH_IP "eip"      // IP address
 #define NVS_KEY_ETH_NETMASK "enm" // Netmask
