@@ -1,3 +1,4 @@
+#include "pcf8574.h"
 #include "dio.h"
 #include "esp_event.h"
 
@@ -47,6 +48,7 @@ esp_err_t init_do()
     if (res == ESP_OK)
     {
         res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
+        di_set_nvs_state();
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else

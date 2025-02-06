@@ -150,6 +150,7 @@ static esp_err_t spi_bus_init(void)
         .sclk_io_num = CONFIG_UMNI_ETH_SPI_SCLK_GPIO,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+        .max_transfer_sz = 4000,
     };
     ESP_GOTO_ON_ERROR(spi_bus_initialize(CONFIG_UMNI_ETH_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO),
                       err, TAG, "SPI host #%d init failed", CONFIG_UMNI_ETH_SPI_HOST);
@@ -433,7 +434,7 @@ esp_err_t init_fs(void)
 esp_err_t init_fs(void)
 {
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
+        .format_if_mount_failed = true,
         .max_files = 5,
         .allocation_unit_size = 16 * 1024};
     sdmmc_card_t *card;
@@ -444,10 +445,17 @@ esp_err_t init_fs(void)
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.max_freq_khz = 12 * 1000; // пониженная частота для общения с SD SPI
     slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
-    ESP_ERROR_CHECK(esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card));
-    sdmmc_card_print_info(stdout, card);
-    esp_event_post(APP_EVENTS, EV_SDCARD_MOUNTED, NULL, sizeof(NULL), portMAX_DELAY);
-    return ESP_OK;
+    esp_err_t res = esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card);
+    if (res == ESP_OK)
+    {
+        sdmmc_card_print_info(stdout, card);
+        esp_event_post(APP_EVENTS, EV_SDCARD_MOUNTED, NULL, sizeof(NULL), portMAX_DELAY);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Faled mount SD card %s", esp_err_to_name(res));
+    }
+    return res;
 }
 
 #endif

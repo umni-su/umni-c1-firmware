@@ -121,11 +121,12 @@ void um_systeminfo_init()
 
 um_systeminfo_data_type_t um_systeminfo_get_struct_data()
 {
+    char *reset_at = um_nvs_read_str(NVS_KEY_RESET_AT);
     esp_chip_info_t info;
     esp_chip_info(&info);
     um_systeminfo_data_type_t data = {
         .date = strftime_buf,
-        .last_reset = um_nvs_read_str(NVS_KEY_RESET_AT),
+        .last_reset = reset_at,
         .uptime = esp_timer_get_time(),
         .restart_reason = esp_reset_reason(),
         .free_heap = esp_get_free_heap_size(),
@@ -142,6 +143,6 @@ um_systeminfo_data_type_t um_systeminfo_get_struct_data()
             .mask = eth_ip_info.mask,
             .gw = eth_ip_info.gw,
             .mac = eth_ip_info.mac}};
-
+    free(reset_at);
     return data;
 }

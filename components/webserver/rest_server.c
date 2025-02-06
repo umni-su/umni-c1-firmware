@@ -27,6 +27,8 @@
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 #include "../systeminfo/systeminfo.h"
+#include "../config/config.h"
+#include "../dio/dio.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
@@ -350,7 +352,43 @@ static esp_err_t adm_auth_logout(httpd_req_t *req)
 
 static esp_err_t adm_st_dio(httpd_req_t *req)
 {
-    ///...
+    httpd_resp_set_type(req, "application/json");
+    char *config = um_config_get_config_file_dio();
+    httpd_resp_sendstr(req, config);
+    free((void *)config);
+    return ESP_OK;
+}
+
+/** POST to dio */
+static esp_err_t system_info_post_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    bool success = false;
+    char *buf = prepare_post_buffer(req);
+    cJSON *res = cJSON_CreateObject();
+    cJSON *data = cJSON_Parse(buf);
+
+    char *type = cJSON_GetObjectItem(data, "type")->valuestring;
+
+    cJSON *state = cJSON_GetObjectItem(data, "state");
+
+    if (strcmp(type, "dio") == 0)
+    {
+        success = true;
+        int index = cJSON_GetObjectItem(state, "index")->valueint;
+        int value = cJSON_GetObjectItem(state, "state")->valueint;
+        do_set_level(index, value);
+    }
+
+    cJSON_AddBoolToObject(res, "success", success);
+
+    char *answer = cJSON_PrintUnformatted(res);
+
+    httpd_resp_sendstr(req, answer);
+    // free((void *)buf);
+    free((void *)answer);
+    cJSON_Delete(data);
+    cJSON_Delete(res);
     return ESP_OK;
 }
 
@@ -423,6 +461,13 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = system_info_get_handler,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &system_info_get_uri);
+
+    httpd_uri_t adm_st_post_uri = {
+        .uri = "/adm/st",
+        .method = HTTP_POST,
+        .handler = system_info_post_handler,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_post_uri);
 
     // DIO get
     httpd_uri_t adm_st_dio_uri = {

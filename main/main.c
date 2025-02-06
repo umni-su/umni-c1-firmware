@@ -43,9 +43,12 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         {
         case EV_SDCARD_MOUNTED:
             um_config_init();
+            break;
+
+        case EV_CONFIGURATION_READY:
             webserver_start();
-            // Инициализируем входы при инициализации NVS
-            // чтобы обеспечить необходимый уровень при включении
+            //  Инициализируем входы при инициализации NVS
+            //  чтобы обеспечить необходимый уровень при включении
             ESP_ERROR_CHECK(init_do());
             ESP_ERROR_CHECK(init_di());
             break;

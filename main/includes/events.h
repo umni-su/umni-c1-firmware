@@ -19,6 +19,7 @@ extern "C"
         EV_ETH_START,
         EV_ETH_MAC,
         EV_SDCARD_MOUNTED,
+        EV_CONFIGURATION_READY,
         EV_ETH_GOT_IP,
         EV_ETH_STOP,
         EV_WIFI_MODE_UPDATED,

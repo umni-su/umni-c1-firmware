@@ -1,9 +1,10 @@
+#pragma once
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <esp_err.h>
 #include <esp_log.h>
-#include "pcf8574.h"
 
 #define I2C_DO_ADDR CONFIG_UMNI_DO_I2C_ADDR
 
