@@ -11,6 +11,7 @@
 
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
+#include "../dio/dio.h"
 #include "freertos/FreeRTOS.h"
 #include "esp_event.h"
 
@@ -132,12 +133,19 @@ void um_config_create_config_file_sensors()
 
         for (int i = 0; i < 6; i++)
         {
-            char label[10];
-            sprintf(label, "Relay %d", do_channels[i]);
+            char label_do[10];
+            char label_di[10];
+            sprintf(label_do, "Relay %d", do_channels[i]);
             cJSON *state_do = cJSON_CreateObject();
-            cJSON_AddStringToObject(state_do, "label", label);
+            cJSON_AddStringToObject(state_do, "label", label_do);
             cJSON_AddNumberToObject(state_do, "index", i);
             cJSON_AddItemToArray(outputs, state_do);
+
+            sprintf(label_di, "Input %d", do_channels[i]);
+            cJSON *state_di = cJSON_CreateObject();
+            cJSON_AddStringToObject(state_di, "label", label_di);
+            cJSON_AddNumberToObject(state_di, "index", i);
+            cJSON_AddItemToArray(inputs, state_di);
         }
 
         cJSON_AddItemToObject(root, "do", outputs);
@@ -192,17 +200,29 @@ char *um_config_get_config_file_dio()
 {
     cJSON *el = NULL;
     cJSON *do_array = NULL;
+    cJSON *di_array = NULL;
     char *config = um_config_get_config_file(CONFIG_FILE_SENSORS);
     cJSON *root = cJSON_Parse(config);
 
     do_array = cJSON_GetObjectItemCaseSensitive(root, "do");
+    di_array = cJSON_GetObjectItemCaseSensitive(root, "di");
 
     int8_t relays = um_nvs_read_i8(NVS_KEY_RELAYS);
+    int8_t inputs = di_get_state();
     int i = 0;
+    int level = 0;
     cJSON_ArrayForEach(el, do_array)
     {
-        int level = 0;
         level = ((relays >> i) & 0x01) == 0 ? 1 : 0;
+        cJSON_AddNumberToObject(el, "state", level);
+        i++;
+    }
+    i = 0;
+    el = NULL;
+    cJSON_ArrayForEach(el, di_array)
+    {
+        level = 0;
+        level = ((inputs >> i) & 0x01) == 0 ? 0 : 1;
         cJSON_AddNumberToObject(el, "state", level);
         i++;
     }

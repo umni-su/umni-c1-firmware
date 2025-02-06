@@ -23,7 +23,7 @@ esp_err_t do_register_events()
     // return esp_event_handler_register(APP_EVENTS, S_CONFIG_SPIFFS_READY, &config_spiffs_mounted, NULL);
 }
 
-uint8_t di_get_nvs_state()
+uint8_t do_get_nvs_state()
 {
     int8_t state = um_nvs_read_i8(NVS_KEY_RELAYS);
     if ((int)state == -1)
@@ -33,7 +33,7 @@ uint8_t di_get_nvs_state()
     return (uint8_t)state;
 }
 
-esp_err_t di_set_nvs_state()
+esp_err_t do_set_nvs_state()
 {
     return um_nvs_write_i8(NVS_KEY_RELAYS, output_data);
 }
@@ -41,14 +41,14 @@ esp_err_t di_set_nvs_state()
 esp_err_t init_do()
 {
     esp_err_t res = ESP_OK;
-    output_data = di_get_nvs_state();
+    output_data = do_get_nvs_state();
     memset(&pcf8574_output_dev_t, 0, sizeof(i2c_dev_t));
     pcf8574_output_dev_t.cfg.master.clk_speed = 5000; // Hz
     res = pcf8574_init_desc(&pcf8574_output_dev_t, I2C_DO_ADDR, 0, CONFIG_UMNI_I2C_SDA, CONFIG_UMNI_I2C_SCL);
     if (res == ESP_OK)
     {
         res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
-        di_set_nvs_state();
+        do_set_nvs_state();
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else
@@ -88,8 +88,8 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
     esp_err_t res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
     if (res == ESP_OK)
     {
-        res = di_set_nvs_state();
-        ESP_LOGW("DO STATE", "%u", di_get_nvs_state());
+        res = do_set_nvs_state();
+        ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
     }
     if (res != ESP_OK)
     {
@@ -226,6 +226,8 @@ esp_err_t init_di()
     if (res == ESP_OK)
     {
         pcf8574_port_write(&pcf8574_input_dev_t, (uint8_t)input_data);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
+        pcf8574_port_read(&pcf8574_input_dev_t, &input_data);
     }
 
     return res;
@@ -246,4 +248,9 @@ void di_interrupt_task(void *arg)
         }
     }
     vTaskDelete(NULL);
+}
+
+int8_t di_get_state()
+{
+    return input_data;
 }
