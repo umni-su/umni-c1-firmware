@@ -28,7 +28,9 @@
 #include "../nvs/nvs.h"
 #include "../systeminfo/systeminfo.h"
 #include "../config/config.h"
+#include "../opentherm/opentherm_operations.h"
 #include "../dio/dio.h"
+#include "../adc/adc.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
@@ -359,6 +361,37 @@ static esp_err_t adm_st_dio(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t adm_st_ot(httpd_req_t *req)
+{
+    um_ot_data_t data = um_ot_get_data();
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "status", data.status);
+    cJSON_AddNumberToObject(root, "otch", data.otch);
+    cJSON_AddNumberToObject(root, "ottbsp", data.ottbsp);
+    cJSON_AddNumberToObject(root, "otdhwsp", data.otdhwsp);
+    cJSON_AddNumberToObject(root, "central_heating_active", data.central_heating_active);
+    cJSON_AddNumberToObject(root, "hot_water_active", data.hot_water_active);
+    cJSON_AddNumberToObject(root, "flame_on", data.flame_on);
+    cJSON_AddNumberToObject(root, "modulation", data.modulation);
+    cJSON_AddNumberToObject(root, "pressure", data.pressure);
+    cJSON_AddNumberToObject(root, "slave_ot_version", data.slave_ot_version);
+    cJSON_AddNumberToObject(root, "slave_product_version", data.slave_product_version);
+    cJSON_AddNumberToObject(root, "dhw_temperature", data.dhw_temperature);
+    cJSON_AddNumberToObject(root, "boiler_temperature", data.boiler_temperature);
+    cJSON_AddNumberToObject(root, "return_temperature", data.return_temperature);
+    cJSON_AddBoolToObject(root, "fault", data.is_fault);
+    cJSON_AddNumberToObject(root, "fault_code", data.fault_code);
+    cJSON_AddNumberToObject(root, "ntc1", get_ntc_data_channel_temp(AN_NTC_1));
+    cJSON_AddNumberToObject(root, "ntc2", get_ntc_data_channel_temp(AN_NTC_2));
+
+    char *res = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, res);
+    free((void *)res);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 /** POST to dio */
 static esp_err_t system_info_post_handler(httpd_req_t *req)
 {
@@ -378,6 +411,20 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
         int index = cJSON_GetObjectItem(state, "index")->valueint;
         int value = cJSON_GetObjectItem(state, "state")->valueint;
         do_set_level(index, value);
+    }
+
+    if (strcmp(type, "ot") == 0)
+    {
+        // otch: true
+        // otdhwsp: 45
+        // ottbsp:55
+        success = true;
+        cJSON *ch = cJSON_GetObjectItem(state, "otch");
+        bool otch = cJSON_IsTrue(ch);
+        int otdhwsp = cJSON_GetObjectItem(state, "otdhwsp")->valueint;
+        int ottbsp = cJSON_GetObjectItem(state, "ottbsp")->valueint;
+
+        um_ot_update_state(otch, otdhwsp, ottbsp);
     }
 
     cJSON_AddBoolToObject(res, "success", success);
@@ -476,6 +523,14 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_st_dio,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_dio_uri);
+
+    // DIO get
+    httpd_uri_t adm_st_ot_uri = {
+        .uri = "/adm/st/ot",
+        .method = HTTP_GET,
+        .handler = adm_st_ot,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_ot_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

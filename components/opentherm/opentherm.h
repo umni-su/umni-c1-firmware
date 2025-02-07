@@ -248,6 +248,8 @@ float esp_ot_get_dhw_temperature();
 
 float esp_ot_get_modulation();
 
+float esp_ot_get_modulation_level_setting();
+
 float esp_ot_get_pressure();
 
 unsigned char esp_ot_get_fault();

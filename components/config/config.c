@@ -62,8 +62,8 @@ char *um_config_get_config_file(char *config_name)
         return NULL;
     }
     char *text = um_config_get_text_from_file(file);
-    ESP_LOGI(CONFIG_TAG, "Contents of %s is: %s", filename, text);
-    //  ESP_LOGW(CONFIG_TAG, "Config filename is %s", filename);
+    // ESP_LOGI(CONFIG_TAG, "Contents of %s is: %s", filename, text);
+    //   ESP_LOGW(CONFIG_TAG, "Config filename is %s", filename);
 
     // free(file_buf);
     fclose(file);
@@ -211,6 +211,7 @@ char *um_config_get_config_file_dio()
     int8_t inputs = di_get_state();
     int i = 0;
     int level = 0;
+    // TODO change i with CONFIG_UMNI_DI_
     cJSON_ArrayForEach(el, do_array)
     {
         level = ((relays >> i) & 0x01) == 0 ? 1 : 0;

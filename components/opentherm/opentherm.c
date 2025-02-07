@@ -759,6 +759,17 @@ float esp_ot_get_modulation()
 }
 
 /**
+ * Get modulation level setting
+ *
+ * @return  float
+ */
+float esp_ot_get_modulation_level_setting()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_MAX_REL_MOD_LEVEL_SETTINGG, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
  * Get pressure
  *
  * @return  float
