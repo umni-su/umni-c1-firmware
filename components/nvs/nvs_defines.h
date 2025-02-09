@@ -50,6 +50,7 @@
 #define NVS_KEY_RELAYS "relays"
 
 /** MQTT */
+#define NVS_KEY_MQTT_ENABLED "mqen"
 #define NVS_KEY_MQTT_HOST "mqhost"
 #define NVS_KEY_MQTT_PORT "mqport"
 #define NVS_KEY_MQTT_USER "mquser"

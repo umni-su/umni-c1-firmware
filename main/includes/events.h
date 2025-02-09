@@ -27,6 +27,7 @@ extern "C"
         EV_SPIFFS_READY,
         EV_NVS_OPENED,
         EV_DO_INIT,
+        EV_ONEWIRE_INIT,
         EV_SYSTEM_INSTALLED,
         EV_NTP_SYNC_SUCCESS
     };

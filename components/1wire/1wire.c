@@ -1,17 +1,16 @@
+#include "../../main/includes/events.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_event.h"
 #include "1wire.h"
 
-#define ONE_WIRE_PIN CONFIG_UMNI_ONEWIRE_PIN // hc32esp default 1wire pin
-#define ONE_WIRE "onewire"
-#define MAX_SENSORS 10 // max sensors on bus
-#define ONE_WIRE_TASK_PRIORITY 12
-// onewire_addr_t addrs[MAX_SENSORS];
+// onewire_addr_t addrs[ONEWIRE_MAX_SENSORS];
 //  size_t sensor_count = 0;
 const char *ONE_WIRE_TAG = "onewire";
 const char *ONE_WIRE_TASK_TAG = "onewire-task";
 
-onewire_addr_t addresses[MAX_SENSORS] = {0};
+onewire_addr_t addresses[ONEWIRE_MAX_SENSORS] = {0};
+um_onewire_sensor_t sensors[ONEWIRE_MAX_SENSORS];
 
 TaskHandle_t onewire_task_handle = NULL;
 
@@ -20,7 +19,7 @@ void onewire_task(void *arg)
     char string_address[16] = {0};
     while (true)
     {
-        for (int i = 0; i < MAX_SENSORS; i++)
+        for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++)
         {
             if (addresses[i] != 0)
             {
@@ -58,12 +57,17 @@ void onewire_task(void *arg)
 
 void onewire_configure()
 {
-    ESP_LOGI(ONE_WIRE_TAG, "Starting one-wire bus with MAX_SENSORS = %d", MAX_SENSORS);
+    ESP_LOGI(ONE_WIRE_TAG, "Starting one-wire bus with ONEWIRE_MAX_SENSORS = %d", ONEWIRE_MAX_SENSORS);
 
     onewire_reset(ONE_WIRE_PIN);
     onewire_skip_rom(ONE_WIRE_PIN);
 
     onewire_init_config();
+}
+
+um_onewire_sensor_t *onewire_get_sensors()
+{
+    return sensors;
 }
 
 void onewire_init_config()
@@ -80,7 +84,7 @@ void onewire_init_config()
         uint8_t family_id = (uint8_t)addr;
         if (family_id == DS18X20_FAMILY_DS18S20 || family_id == DS18X20_FAMILY_DS1822 || family_id == DS18X20_FAMILY_DS18B20 || family_id == DS18X20_FAMILY_MAX31850)
         {
-            if (found < MAX_SENSORS)
+            if (found < ONEWIRE_MAX_SENSORS)
             {
                 addresses[found] = addr;
             }
@@ -90,16 +94,17 @@ void onewire_init_config()
     }
     if (found > 0) // if sensors founded
     {
-        for (int i = 0; i < MAX_SENSORS; i++) // switch all founded addresses
+        for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++) // switch all founded addresses
         {
             if (addresses[i] != 0) // if address != 0, continue
             {
                 // https: // stackoverflow.com/questions/8323159/how-to-convert-uint64-t-value-in-const-char-string
                 //  length of 2**64 - 1, +1 for nul.
                 char string_number[21];
-                // sprintf(string_number, "%08llx", (uint64_t)addresses[i]);
+                sensors[i].active = true;
+                sensors[i].address = (uint64_t)addresses[i];
 
-                onewire_uint64_t_to_addr_str((uint64_t)addresses[i], string_number);
+                onewire_uint64_t_to_addr_str(sensors[i].address, string_number);
                 ESP_LOGI(ONE_WIRE_TAG, "Found sensor %s", string_number);
             }
         }
@@ -108,6 +113,8 @@ void onewire_init_config()
     {
         ESP_LOGW(ONE_WIRE_TAG, "No 1-wire sensors found");
     }
+
+    esp_event_post(APP_EVENTS, EV_ONEWIRE_INIT, NULL, sizeof(NULL), portMAX_DELAY);
 
     xTaskCreatePinnedToCore(onewire_task, "onewire_task", 4096, NULL, ONE_WIRE_TASK_PRIORITY, &onewire_task_handle, 1);
 }
@@ -119,15 +126,6 @@ void onewire_addr_str_to_uint64_t(char *address, uint64_t *out)
 
 void onewire_uint64_t_to_addr_str(onewire_addr_t address, char *out)
 {
-    /*char buff[16] = {0};
-    uint32_t first = (uint32_t)(address >> 32);
-    uint32_t second = (uint32_t)address;
-    strcpy(out, itoa(first, buff, 16));
-    strcat(out, itoa(second, buff, 16));*/
-
-    // https: // stackoverflow.com/questions/8323159/how-to-convert-uint64-t-value-in-const-char-string
-    //  length of 2**64 - 1, +1 for nul.
-    // char string_number[21];
     sprintf(out, "%08llx", (uint64_t)address);
 }
 

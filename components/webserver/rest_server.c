@@ -439,6 +439,234 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/** GET to settings configuration*/
+static esp_err_t adm_settings(httpd_req_t *req)
+{
+    cJSON *config = cJSON_CreateObject();
+
+    char *dio_config = um_config_get_config_file_dio();
+    char *one_wire_config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
+
+    char *name = um_nvs_read_str(NVS_KEY_HOSTNAME);
+    char *adm = um_nvs_read_str(NVS_KEY_USERNAME);
+    int upd = um_nvs_read_i8(NVS_KEY_UPDATES_CHANNEL);
+    char *tz = um_nvs_read_str(NVS_KEY_TIMEZONE);
+    char *ntp = um_nvs_read_str(NVS_KEY_NTP);
+
+    cJSON *c_system = cJSON_CreateObject();
+    cJSON_AddStringToObject(c_system, NVS_KEY_HOSTNAME, name);
+    cJSON_AddNumberToObject(c_system, NVS_KEY_UPDATES_CHANNEL, upd);
+    cJSON_AddStringToObject(c_system, NVS_KEY_TIMEZONE, tz);
+    cJSON_AddStringToObject(c_system, NVS_KEY_NTP, ntp);
+    cJSON_AddStringToObject(c_system, NVS_KEY_USERNAME, adm);
+
+    cJSON *c_network = cJSON_CreateObject();
+
+    int et = um_nvs_read_i8(NVS_KEY_ETH_TYPE);
+    char *eip = um_nvs_read_str(NVS_KEY_ETH_IP);
+    char *enm = um_nvs_read_str(NVS_KEY_ETH_NETMASK);
+    char *egw = um_nvs_read_str(NVS_KEY_ETH_GATEWAY);
+    char *edns = um_nvs_read_str(NVS_KEY_ETH_DNS);
+    cJSON_AddNumberToObject(c_network, NVS_KEY_ETH_TYPE, et);
+    cJSON_AddStringToObject(c_network, NVS_KEY_ETH_IP, eip);
+    cJSON_AddStringToObject(c_network, NVS_KEY_ETH_NETMASK, enm);
+    cJSON_AddStringToObject(c_network, NVS_KEY_ETH_GATEWAY, egw);
+    cJSON_AddStringToObject(c_network, NVS_KEY_ETH_DNS, edns);
+
+    int wt = um_nvs_read_i8(NVS_KEY_WIFI_TYPE);
+    char *wip = um_nvs_read_str(NVS_KEY_WIFI_IP);
+    char *wnm = um_nvs_read_str(NVS_KEY_WIFI_NETMASK);
+    char *wgw = um_nvs_read_str(NVS_KEY_WIFI_GATEWAY);
+    char *wdns = um_nvs_read_str(NVS_KEY_WIFI_DNS);
+    cJSON_AddNumberToObject(c_network, NVS_KEY_WIFI_TYPE, wt);
+    cJSON_AddStringToObject(c_network, NVS_KEY_WIFI_IP, wip);
+    cJSON_AddStringToObject(c_network, NVS_KEY_WIFI_NETMASK, wnm);
+    cJSON_AddStringToObject(c_network, NVS_KEY_WIFI_GATEWAY, wgw);
+    cJSON_AddStringToObject(c_network, NVS_KEY_WIFI_DNS, wdns);
+
+    cJSON *c_api = cJSON_CreateObject();
+
+    int mqen = um_nvs_read_i8(NVS_KEY_MQTT_ENABLED);
+    char *mqhost = um_nvs_read_str(NVS_KEY_MQTT_HOST);
+    int mqport = um_nvs_read_i8(NVS_KEY_MQTT_PORT);
+    char *mquser = um_nvs_read_str(NVS_KEY_MQTT_USER);
+    char *mqpwd = um_nvs_read_str(NVS_KEY_MQTT_PWD);
+    int whk = um_nvs_read_i8(NVS_KEY_WEBHOOKS);
+    char *whkuri = um_nvs_read_str(NVS_KEY_WEBHOOKS_URL);
+
+    cJSON_AddNumberToObject(c_api, NVS_KEY_MQTT_ENABLED, mqen);
+    cJSON_AddStringToObject(c_api, NVS_KEY_MQTT_HOST, mqhost);
+    cJSON_AddNumberToObject(c_api, NVS_KEY_MQTT_PORT, mqport);
+    cJSON_AddStringToObject(c_api, NVS_KEY_MQTT_USER, mquser);
+    cJSON_AddStringToObject(c_api, NVS_KEY_MQTT_PWD, mqpwd);
+
+    cJSON_AddNumberToObject(c_api, NVS_KEY_WEBHOOKS, whk);
+    cJSON_AddStringToObject(c_api, NVS_KEY_WEBHOOKS_URL, whkuri);
+
+    cJSON *c_dio = cJSON_Parse(dio_config);
+
+    cJSON_AddItemToObject(config, "system", c_system);
+    cJSON_AddItemToObject(config, "network", c_network);
+    cJSON_AddItemToObject(config, "do", cJSON_GetObjectItem(c_dio, "do"));
+    cJSON_AddItemToObject(config, "di", cJSON_GetObjectItem(c_dio, "di"));
+    cJSON_AddItemToObject(config, "api", c_api);
+
+    if (one_wire_config != NULL)
+    {
+        cJSON *ow = cJSON_Parse(one_wire_config);
+        cJSON_AddItemToObject(config, "ow", ow);
+    }
+
+    char *res = cJSON_PrintUnformatted(config);
+    httpd_resp_sendstr(req, res);
+    free((void *)dio_config);
+    free((void *)one_wire_config);
+    free((void *)res);
+    cJSON_Delete(config);
+
+    return ESP_OK;
+}
+
+/** POST save settings */
+static esp_err_t adm_settings_save(httpd_req_t *req)
+{
+    char *buff = prepare_post_buffer(req);
+    cJSON *post = cJSON_Parse(buff);
+
+    cJSON *res = cJSON_CreateObject();
+    bool success = false;
+
+    char *type = cJSON_GetObjectItem(post, "type")->valuestring;
+
+    cJSON *data = cJSON_GetObjectItem(post, "data");
+
+    if (strcmp(type, "system") == 0)
+    {
+        char *name = cJSON_GetObjectItem(data, "name")->valuestring;
+        char *ntp = cJSON_GetObjectItem(data, "ntp")->valuestring;
+        char *tz = cJSON_GetObjectItem(data, "tz")->valuestring;
+        int upd = cJSON_GetObjectItem(data, "upd")->valueint;
+
+        bool has_username = cJSON_HasObjectItem(data, "admuser");
+        bool has_password = cJSON_HasObjectItem(data, "pwd");
+
+        if (has_username && has_password)
+        {
+            char *admuser = cJSON_GetObjectItem(data, "admuser")->valuestring;
+            char *pwd = cJSON_GetObjectItem(data, "pwd")->valuestring;
+
+            um_nvs_write_str(NVS_KEY_USERNAME, admuser);
+            um_nvs_write_str(NVS_KEY_PASSWORD, pwd);
+        }
+
+        um_nvs_write_str(NVS_KEY_HOSTNAME, name);
+        um_nvs_write_str(NVS_KEY_NTP, ntp);
+        um_nvs_write_str(NVS_KEY_TIMEZONE, tz);
+        um_nvs_write_i8(NVS_KEY_UPDATES_CHANNEL, upd);
+
+        success = true;
+    }
+
+    if (strcmp(type, "network") == 0)
+    {
+        int et = cJSON_GetObjectItem(data, "et")->valueint;
+        char *eip = cJSON_HasObjectItem(data, "eip") ? cJSON_GetObjectItem(data, "eip")->valuestring : NULL;
+        char *enm = cJSON_HasObjectItem(data, "enm") ? cJSON_GetObjectItem(data, "enm")->valuestring : NULL;
+        char *egw = cJSON_HasObjectItem(data, "egw") ? cJSON_GetObjectItem(data, "egw")->valuestring : NULL;
+        char *edns = cJSON_HasObjectItem(data, "edns") ? cJSON_GetObjectItem(data, "edns")->valuestring : NULL;
+
+        int wt = cJSON_GetObjectItem(data, "wt")->valueint;
+        char *wip = cJSON_HasObjectItem(data, "wip") ? cJSON_GetObjectItem(data, "wip")->valuestring : NULL;
+        char *wnm = cJSON_HasObjectItem(data, "wnm") ? cJSON_GetObjectItem(data, "wnm")->valuestring : NULL;
+        char *wgw = cJSON_HasObjectItem(data, "wgw") ? cJSON_GetObjectItem(data, "wgw")->valuestring : NULL;
+        char *wdns = cJSON_HasObjectItem(data, "wdns") ? cJSON_GetObjectItem(data, "wdns")->valuestring : NULL;
+
+        char *stname = cJSON_HasObjectItem(data, "stname") ? cJSON_GetObjectItem(data, "stname")->valuestring : NULL;
+        char *stpwd = cJSON_HasObjectItem(data, "stname") ? cJSON_GetObjectItem(data, "stname")->valuestring : NULL;
+
+        um_nvs_write_i8(NVS_KEY_ETH_TYPE, et);
+        if (eip)
+            um_nvs_write_str(NVS_KEY_ETH_IP, eip);
+        if (enm)
+            um_nvs_write_str(NVS_KEY_ETH_NETMASK, enm);
+        if (egw)
+            um_nvs_write_str(NVS_KEY_ETH_GATEWAY, egw);
+        if (edns)
+            um_nvs_write_str(NVS_KEY_ETH_DNS, edns);
+
+        um_nvs_write_i8(NVS_KEY_WIFI_TYPE, wt);
+        if (wip)
+            um_nvs_write_str(NVS_KEY_WIFI_IP, wip);
+        if (wnm)
+            um_nvs_write_str(NVS_KEY_WIFI_NETMASK, wnm);
+        if (wgw)
+            um_nvs_write_str(NVS_KEY_WIFI_GATEWAY, wgw);
+        if (wdns)
+            um_nvs_write_str(NVS_KEY_WIFI_DNS, wdns);
+
+        if (stname)
+            um_nvs_write_str(NVS_KEY_WIFI_STA_SSID, stname);
+        if (stpwd)
+            um_nvs_write_str(NVS_KEY_WIFI_STA_PWD, stpwd);
+
+        success = true;
+    }
+
+    if (strcmp(type, "sensors") == 0)
+    {
+        success = um_config_write_config_file(CONFIG_FILE_SENSORS, data);
+    }
+
+    if (strcmp(type, "api") == 0)
+    {
+        int mqen = cJSON_GetObjectItem(data, "mqen")->valueint;
+        char *mqhost = cJSON_HasObjectItem(data, "mqhost") ? cJSON_GetObjectItem(data, "mqhost")->valuestring : NULL;
+        int mqport = cJSON_HasObjectItem(data, "mqport") ? cJSON_GetObjectItem(data, "mqport")->valueint : 0;
+        char *mquser = cJSON_HasObjectItem(data, "mquser") ? cJSON_GetObjectItem(data, "mquser")->valuestring : NULL;
+        char *mqpwd = cJSON_HasObjectItem(data, "mqpwd") ? cJSON_GetObjectItem(data, "mqpwd")->valuestring : NULL;
+
+        int whk = cJSON_GetObjectItem(data, "whk")->valueint;
+        char *whkurl = cJSON_HasObjectItem(data, "whkurl") ? cJSON_GetObjectItem(data, "whkurl")->valuestring : NULL;
+
+        if (mqen == 1)
+        {
+            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, 1);
+            if (mqhost)
+                um_nvs_write_str(NVS_KEY_MQTT_HOST, mqhost);
+            if (mqport)
+                um_nvs_write_i8(NVS_KEY_MQTT_PORT, mqport);
+            if (mquser)
+                um_nvs_write_str(NVS_KEY_MQTT_USER, mquser);
+            if (mqpwd)
+                um_nvs_write_str(NVS_KEY_MQTT_PWD, mqpwd);
+        }
+        else
+        {
+            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, 0);
+        }
+
+        if (whk == 1)
+        {
+            um_nvs_write_i8(NVS_KEY_WEBHOOKS, 1);
+            um_nvs_write_str(NVS_KEY_WEBHOOKS_URL, whkurl);
+        }
+        else
+        {
+            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, 0);
+        }
+    }
+
+    cJSON_AddBoolToObject(res, "success", success);
+
+    char *json = cJSON_PrintUnformatted(res);
+    httpd_resp_sendstr(req, json);
+
+    free((void *)json);
+    cJSON_Delete(post);
+    cJSON_Delete(res);
+    return ESP_OK;
+}
+
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
@@ -531,6 +759,22 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_st_ot,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_ot_uri);
+
+    // adm/settings get
+    httpd_uri_t adm_settings_uri = {
+        .uri = "/adm/settings",
+        .method = HTTP_GET,
+        .handler = adm_settings,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_settings_uri);
+
+    // adm/settings get
+    httpd_uri_t adm_settings_post_uri = {
+        .uri = "/adm/settings",
+        .method = HTTP_POST,
+        .handler = adm_settings_save,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_settings_post_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

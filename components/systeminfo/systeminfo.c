@@ -79,8 +79,16 @@ void um_systeminfo_init_sntp()
 {
     ntp_host = um_nvs_read_str(NVS_KEY_NTP);
 
+    char *tz = um_nvs_read_str(NVS_KEY_TIMEZONE);
+
+    if (tz == NULL)
+    {
+        tz = "MSK-3";
+        um_nvs_write_str(NVS_KEY_TIMEZONE, tz);
+    }
+
     // configure the event on which we renew servers
-    setenv("TZ", "MSK-3", 1);
+    setenv("TZ", tz, 1);
     tzset();
 
     if (ntp_host != NULL)
@@ -96,6 +104,8 @@ void um_systeminfo_init_sntp()
         esp_netif_sntp_init(&config);
         esp_netif_sntp_start();
     }
+
+    free((void *)tz);
 }
 
 void um_systeminfo_update_date()
