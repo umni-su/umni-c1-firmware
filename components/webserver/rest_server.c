@@ -488,7 +488,7 @@ static esp_err_t adm_settings(httpd_req_t *req)
 
     int mqen = um_nvs_read_i8(NVS_KEY_MQTT_ENABLED);
     char *mqhost = um_nvs_read_str(NVS_KEY_MQTT_HOST);
-    int mqport = um_nvs_read_i8(NVS_KEY_MQTT_PORT);
+    int mqport = um_nvs_read_i16(NVS_KEY_MQTT_PORT);
     char *mquser = um_nvs_read_str(NVS_KEY_MQTT_USER);
     char *mqpwd = um_nvs_read_str(NVS_KEY_MQTT_PWD);
     int whk = um_nvs_read_i8(NVS_KEY_WEBHOOKS);
@@ -634,7 +634,7 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
             if (mqhost)
                 um_nvs_write_str(NVS_KEY_MQTT_HOST, mqhost);
             if (mqport)
-                um_nvs_write_i8(NVS_KEY_MQTT_PORT, mqport);
+                um_nvs_write_i16(NVS_KEY_MQTT_PORT, mqport);
             if (mquser)
                 um_nvs_write_str(NVS_KEY_MQTT_USER, mquser);
             if (mqpwd)

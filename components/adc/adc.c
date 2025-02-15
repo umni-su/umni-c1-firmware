@@ -6,10 +6,12 @@
 #include "freertos/task.h"
 #include "soc/soc_caps.h"
 #include "esp_log.h"
+#include "esp_event.h"
 
 #include "ntc_driver.h"
 
 #include "adc.h"
+#include "../../main/includes/events.h"
 
 const char *ADC_TAG = "adc";
 const char *ADC_TASK_TAG = "adc-task";
@@ -86,7 +88,12 @@ void ntc_queue_task(void *arg)
     {
         if (ntc_dev_get_temperature(handle, &ntc_data[index]) == ESP_OK)
         {
-            ESP_LOGI(ADC_TAG, "NTC CHANNEL %d temperature = %.2f C", chan, get_ntc_data_channel_temp(chan));
+            float temp = get_ntc_data_channel_temp(chan);
+            ESP_LOGI(ADC_TAG, "NTC CHANNEL %d temperature = %.2f C", chan, temp);
+            um_ev_message_ntc message = {
+                .channel = chan,
+                .temp = temp};
+            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
         }
         else
         {

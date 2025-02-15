@@ -16,9 +16,14 @@
 #include "freertos/FreeRTOS.h"
 #include "esp_event.h"
 
+#include "esp_mac.h"
+
 #include "config.h"
 
 const char *CONFIG_TAG = "config";
+
+unsigned char mac[6] = {0};
+char mac_name[11];
 
 void um_config_create_dir_if_not_exists(char *path)
 {
@@ -45,6 +50,21 @@ void um_config_create_dir_if_not_exists(char *path)
 
 esp_err_t um_config_init()
 {
+
+    esp_err_t res = esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
+    if (res == ESP_OK)
+    {
+        sprintf(
+            mac_name,
+            "UMNI%02x%02x%02x",
+            mac[3], mac[4], mac[5]);
+        ESP_LOGI(CONFIG_TAG, "Create UMNI unique name from efuse mac %s", mac_name);
+        um_nvs_write_str(NVS_KEY_MACNAME, mac_name);
+    }
+    else
+    {
+        ESP_LOGE(CONFIG_TAG, "Failed to read mac_name. Check ESP_MAC_USE_CUSTOM_MAC_AS_BASE_MAC in config!");
+    }
     xTaskCreate(um_config_create_config_file_sensors, "um_config_init_dio", configMINIMAL_STACK_SIZE * 6, NULL, 20, NULL);
     return ESP_OK;
 }
@@ -77,6 +97,8 @@ bool um_config_write_config_file(char *config_name, cJSON *root)
     char filename[filename_len];
     char *_content = cJSON_PrintUnformatted(root);
     sprintf(filename, "%s%s%s", CONFIG_UMNI_SD_MOUNT_POINT, CONFIG_PATH, config_name);
+
+    ESP_LOGW("!!!!!!!", "%s", _content);
 
     FILE *file = fopen(filename, "w");
     if (file == NULL)
@@ -247,7 +269,7 @@ void um_config_update_onewire_config_file()
     um_onewire_sensor_t *sensors = onewire_get_sensors();
 
     char *content = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
-    if (content != NULL)
+    if (content != NULL && strlen(content) > 10)
     {
         has_content = true;
     }

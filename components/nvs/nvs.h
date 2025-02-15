@@ -74,6 +74,11 @@ int8_t um_nvs_read_i8(char *key);
  *
  * @return  int8_t       [return description]
  */
+
+/** */
+int16_t um_nvs_read_i16(char *key);
+esp_err_t um_nvs_write_i16(char *key, int16_t value);
+
 esp_err_t um_nvs_read_u16(char *key, uint16_t *out);
 
 /**

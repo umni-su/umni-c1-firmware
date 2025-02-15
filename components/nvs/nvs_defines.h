@@ -2,6 +2,7 @@
 
 #define NVS_KEY_INSTALLED "inst"
 #define NVS_KEY_HOSTNAME "name"
+#define NVS_KEY_MACNAME "macname"
 #define NVS_KEY_USERNAME "admusr"
 #define NVS_KEY_PASSWORD "admpwd"
 #define NVS_KEY_NTP "ntp"

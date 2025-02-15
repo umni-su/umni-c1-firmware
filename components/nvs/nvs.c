@@ -110,6 +110,29 @@ int8_t um_nvs_read_i8(char *key)
     return out_value;
 }
 
+/**
+ * [read_nvs_i8 description]
+ *
+ * @param   char    key  [key description]
+ *
+ * @return  int8_t       [return description]
+ */
+int16_t um_nvs_read_i16(char *key)
+{
+    int16_t out_value;
+    esp_err_t read_err = nvs_get_i16(my_nvs_handle, key, &out_value);
+    if (read_err != ESP_OK)
+    {
+        ESP_LOGE(NVS_TAG, "Key %s not found. esp_err_t %s", key, esp_err_to_name(read_err));
+        return -1;
+    }
+    else
+    {
+        ESP_LOGI(NVS_TAG, "Read (int8_t) KEY: %s, VAL: %d", key, out_value);
+    }
+    return out_value;
+}
+
 esp_err_t um_nvs_read_u16(char *key, uint16_t *out)
 {
     esp_err_t read_err = nvs_get_u16(my_nvs_handle, key, out);
@@ -128,6 +151,16 @@ esp_err_t um_nvs_read_u16(char *key, uint16_t *out)
 esp_err_t um_nvs_write_u16(char *key, uint16_t value)
 {
     esp_err_t err = nvs_set_u16(my_nvs_handle, key, value);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(NVS_TAG, "Error write NVS value. Namespace: %s, value: %d", key, value);
+    }
+    return err;
+}
+
+esp_err_t um_nvs_write_i16(char *key, int16_t value)
+{
+    esp_err_t err = nvs_set_i16(my_nvs_handle, key, value);
     if (err != ESP_OK)
     {
         ESP_LOGE(NVS_TAG, "Error write NVS value. Namespace: %s, value: %d", key, value);

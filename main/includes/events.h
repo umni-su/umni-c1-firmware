@@ -8,6 +8,18 @@ extern "C"
 {
 #endif
 
+    typedef struct
+    {
+        int index;
+        int level;
+    } um_ev_message_dio;
+
+    typedef struct
+    {
+        int channel;
+        float temp;
+    } um_ev_message_ntc;
+
     // Declare an event base
     ESP_EVENT_DECLARE_BASE(APP_EVENTS); // declaration of the timer events family
 
@@ -29,7 +41,10 @@ extern "C"
         EV_DO_INIT,
         EV_ONEWIRE_INIT,
         EV_SYSTEM_INSTALLED,
-        EV_NTP_SYNC_SUCCESS
+        EV_NTP_SYNC_SUCCESS,
+        EV_STATUS_CHANGED_DI,
+        EV_STATUS_CHANGED_DO,
+        EV_STATUS_CHANGED_NTC
     };
 
 #ifdef __cplusplus

@@ -89,6 +89,11 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
     if (res == ESP_OK)
     {
         res = do_set_nvs_state();
+        um_ev_message_dio message = {
+            .index = channel,
+            .level = level};
+
+        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DO, &message, sizeof(message), portMAX_DELAY);
         ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
     }
     if (res != ESP_OK)
@@ -245,6 +250,12 @@ void di_interrupt_task(void *arg)
         {
             ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
             input_data = current_state; // set last level to input pins
+
+            um_ev_message_dio message = {
+                .index = i,
+                .level = pin_level};
+
+            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DI, &message, sizeof(message), portMAX_DELAY);
         }
     }
     vTaskDelete(NULL);

@@ -104,8 +104,6 @@ void um_systeminfo_init_sntp()
         esp_netif_sntp_init(&config);
         esp_netif_sntp_start();
     }
-
-    free((void *)tz);
 }
 
 void um_systeminfo_update_date()

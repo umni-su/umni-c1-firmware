@@ -18,6 +18,7 @@
 #include "../components/1wire/1wire.h"
 #include "../components/systeminfo/systeminfo.h"
 #include "../components/config/config.h"
+#include "../components/mosquitto/mosquitto.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 
@@ -32,7 +33,8 @@ static i2c_dev_t pcf8574_inp;
 static TaskHandle_t do_handle;
 static TaskHandle_t di_handle;
 
-bool webserver_started = false;
+static bool webserver_started = false;
+static bool mqtt_connected = false;
 
 void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -88,6 +90,11 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             if (!webserver_started)
             {
                 webserver_started = true;
+            }
+            if (!mqtt_connected)
+            {
+                mqtt_connected = true;
+                um_mqtt_init();
             }
             break;
         default:
