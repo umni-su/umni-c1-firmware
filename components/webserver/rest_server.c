@@ -31,6 +31,7 @@
 #include "../opentherm/opentherm_operations.h"
 #include "../dio/dio.h"
 #include "../adc/adc.h"
+#include "../ota/ota.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
@@ -208,11 +209,11 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
 /* Simple handler for getting system handler */
 static esp_err_t system_info_get_handler(httpd_req_t *req)
 {
-    ESP_LOGI(REST_TAG, "Free heap size before: %ld", esp_get_free_heap_size());
+    ESP_LOGW(REST_TAG, "Free heap size before: %ld", esp_get_free_heap_size());
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
 
-    um_systeminfo_data_type_t info = um_systeminfo_get_struct_data();
+    const um_systeminfo_data_type_t info = um_systeminfo_get_struct_data();
     cJSON_AddStringToObject(root, "date", info.date);
     cJSON_AddStringToObject(root, "last_reset", info.last_reset);
     cJSON_AddNumberToObject(root, "reset_reason", (int)info.restart_reason);
@@ -240,9 +241,9 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
 
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
-    cJSON_Delete(root);
     free((void *)sys_info);
-    ESP_LOGI(REST_TAG, "Free heap size after: %ld", esp_get_free_heap_size());
+    cJSON_Delete(root);
+    ESP_LOGW(REST_TAG, "Free heap size after: %ld", esp_get_free_heap_size());
     return ESP_OK;
 }
 
@@ -674,6 +675,14 @@ void free_ctx_func(void *ctx)
     free(ctx);
 }
 
+static esp_err_t adm_test(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    um_ota_init();
+    httpd_resp_sendstr(req, "ok");
+    return ESP_OK;
+}
+
 esp_err_t start_rest_server(const char *base_path)
 {
     authenticated = false;
@@ -689,7 +698,7 @@ esp_err_t start_rest_server(const char *base_path)
     config.lru_purge_enable = true;
     config.max_open_sockets = MAX_CLIENTS + 2;
     //---config.global_user_ctx = keep_alive;
-    // config.open_fn = ws_open_fd;
+    //  config.open_fn = ws_open_fd;
     //---config.close_fn = ws_close_fd;
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
@@ -775,6 +784,14 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_settings_save,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_settings_post_uri);
+
+    // adm/settings get
+    httpd_uri_t adm_test_uri = {
+        .uri = "/adm/test",
+        .method = HTTP_GET,
+        .handler = adm_test,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_test_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

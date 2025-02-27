@@ -1,0 +1,15 @@
+menu "UMNI OTA"
+
+    config UMNI_OTA_FW_CHECK_URL_STABLE
+        string "Адрес проверки новой стабильной версии"
+        default "https://umni.su/downloads/devices/umni-c1/stable/latest"
+        help
+            Адрес проверки новой стабильной версии (стабильная версия).
+    
+    config UMNI_OTA_FW_CHECK_URL_BETA
+        string "Адрес проверки новой бета версии"
+        default "https://umni.su/downloads/devices/umni-c1/beta/latest"
+        help
+            Адрес проверки новой бета версии (бета версия).
+    
+endmenu

@@ -19,6 +19,7 @@
 
 const char *TAG = "systeminfo";
 const char *ntp_host;
+static char *reset_at = NULL;
 
 time_t now;
 char strftime_buf[64];
@@ -28,7 +29,10 @@ TaskHandle_t systeminfo_task_handle = NULL;
 
 um_netif_data_type_t eth_ip_info;
 
-static void shutdown_handler()
+static um_systeminfo_data_type_t data;
+
+static void
+shutdown_handler()
 {
     um_nvs_write_str(NVS_KEY_RESET_AT, um_systeminfo_get_date());
 }
@@ -58,6 +62,9 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     eth_ip_info.mask = _mask;
     eth_ip_info.gw = _gw;
     eth_ip_info.mac = _mac;
+
+    // Fire ethernet got ip event
+    esp_event_post(APP_EVENTS, EV_ETH_GOT_IP, (void *)NULL, sizeof(NULL), portMAX_DELAY);
 }
 
 void um_systeminfo_task(void *arg)
@@ -110,7 +117,7 @@ void um_systeminfo_update_date()
 {
     time(&now);
     localtime_r(&now, &timeinfo);
-    strftime(strftime_buf, sizeof(strftime_buf), "%x %X", &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%Y-%m-%d %H:%M:%S", &timeinfo);
 }
 
 char *um_systeminfo_get_date()
@@ -129,28 +136,27 @@ void um_systeminfo_init()
 
 um_systeminfo_data_type_t um_systeminfo_get_struct_data()
 {
-    char *reset_at = um_nvs_read_str(NVS_KEY_RESET_AT);
+    // Утечка?
+    um_systeminfo_update_date();
+    reset_at = um_nvs_read_str(NVS_KEY_RESET_AT);
     esp_chip_info_t info;
     esp_chip_info(&info);
-    um_systeminfo_data_type_t data = {
-        .date = strftime_buf,
-        .last_reset = reset_at,
-        .uptime = esp_timer_get_time(),
-        .restart_reason = esp_reset_reason(),
-        .free_heap = esp_get_free_heap_size(),
-        .total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT),
-        .chip = (int)info.revision,
-        .cores = (int)info.cores,
-        .model = (int)info.model,
-        .idf_ver = IDF_VER,
-        .fw_ver = FW_VER,
-        .fw_ver_web = FW_VER_WEB,
-        .ip_eth_info = {
-            .name = eth_ip_info.name,
-            .ip = eth_ip_info.ip,
-            .mask = eth_ip_info.mask,
-            .gw = eth_ip_info.gw,
-            .mac = eth_ip_info.mac}};
-    free(reset_at);
+    data.date = strftime_buf;
+    data.last_reset = reset_at;
+    data.uptime = esp_timer_get_time();
+    data.restart_reason = esp_reset_reason();
+    data.free_heap = esp_get_free_heap_size();
+    data.total_heap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    data.chip = (int)info.revision;
+    data.cores = (int)info.cores;
+    data.model = (int)info.model;
+    data.idf_ver = IDF_VER;
+    data.fw_ver = FW_VER;
+    data.fw_ver_web = FW_VER_WEB;
+    data.ip_eth_info.name = eth_ip_info.name;
+    data.ip_eth_info.ip = eth_ip_info.ip;
+    data.ip_eth_info.mask = eth_ip_info.mask;
+    data.ip_eth_info.gw = eth_ip_info.gw;
+    data.ip_eth_info.mac = eth_ip_info.mac;
     return data;
 }

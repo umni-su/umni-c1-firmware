@@ -17,11 +17,9 @@ bool need_blink_stat = false;
 
 bool need_blink_err = false;
 
-esp_err_t do_register_events()
-{
-    return ESP_OK;
-    // return esp_event_handler_register(APP_EVENTS, S_CONFIG_SPIFFS_READY, &config_spiffs_mounted, NULL);
-}
+static led_blink_t led_blink_stat_conf;
+
+static led_blink_t led_blink_err_conf;
 
 uint8_t do_get_nvs_state()
 {
@@ -49,6 +47,7 @@ esp_err_t init_do()
     {
         res = pcf8574_port_write(&pcf8574_output_dev_t, output_data);
         do_set_nvs_state();
+        do_blink_led_stat_start_at_boot();
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else
@@ -93,8 +92,11 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
             .index = channel,
             .level = level};
 
-        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DO, &message, sizeof(message), portMAX_DELAY);
-        ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
+        if (channel != CONFIG_UMNI_ERR_LED && channel != CONFIG_UMNI_STAT_LED)
+        {
+            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DO, (void *)&message, sizeof(message), portMAX_DELAY);
+            ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
+        }
     }
     if (res != ESP_OK)
     {
@@ -107,23 +109,30 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
 /// @param arg
 void do_blink_led_start_task(void *arg)
 {
-    led_blink_t *led_blink_conf = (led_blink_t *)arg;
-    int timeout = led_blink_conf->timeout;
-    int count = (int)led_blink_conf->count;
-    int pause = (int)led_blink_conf->pause;
-    di_port_index_t chan = (int)led_blink_conf->chan;
-    ESP_LOGI("do_blink_led_stat_start_task", "Timeout: %d, pause: %d, count: %d", timeout, pause, count);
-
     while (need_blink_stat)
     {
-        for (int i = 0; i < count; i++)
+        led_blink_t *led_blink_conf = (led_blink_t *)arg;
+        int timeout = led_blink_conf->timeout;
+        int count = (int)led_blink_conf->count;
+        int pause = (int)led_blink_conf->pause;
+        bool active = (bool)led_blink_conf->active;
+        di_port_index_t chan = (int)led_blink_conf->chan;
+        // ESP_LOGI("do_blink_led_stat_start_task", "[CHAN %d]Timeout: %d, pause: %d, count: %d", chan, timeout, pause, count);
+        if (active)
         {
-            do_set_level(chan, DO_HIGH);
-            vTaskDelay(timeout / portTICK_PERIOD_MS);
-            do_set_level(chan, DO_LOW);
-            vTaskDelay(timeout / portTICK_PERIOD_MS);
+            for (int i = 0; i < count; i++)
+            {
+                do_set_level(chan, DO_HIGH);
+                vTaskDelay(timeout / portTICK_PERIOD_MS);
+                do_set_level(chan, DO_LOW);
+                vTaskDelay(timeout / portTICK_PERIOD_MS);
+            }
+            vTaskDelay(pause / portTICK_PERIOD_MS);
         }
-        vTaskDelay(pause / portTICK_PERIOD_MS);
+        else
+        {
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        }
     }
     vTaskDelete(NULL);
 }
@@ -133,12 +142,12 @@ void do_blink_led_stat_start_at_boot()
 {
     do_blink_led_stop(LED_STAT);
     need_blink_stat = true;
-    led_blink_t led_blink_conf = {
-        .chan = LED_STAT,
-        .count = 2,
-        .pause = 0,
-        .timeout = 500};
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_at_boot", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+    led_blink_stat_conf.active = true;
+    led_blink_stat_conf.chan = LED_STAT;
+    led_blink_stat_conf.count = 2;
+    led_blink_stat_conf.pause = 0;
+    led_blink_stat_conf.timeout = 1000;
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_at_boot", configMINIMAL_STACK_SIZE * 2, &led_blink_stat_conf, 20, NULL);
 }
 
 /// @brief Индикация нормального режима работы
@@ -146,12 +155,12 @@ void do_blink_led_stat_start_working()
 {
     do_blink_led_stop(LED_STAT);
     need_blink_stat = true;
-    led_blink_t led_blink_conf = {
-        .chan = LED_STAT,
-        .count = 1,
-        .pause = 10000,
-        .timeout = 100};
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_working", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+    led_blink_stat_conf.active = true;
+    led_blink_stat_conf.chan = LED_STAT;
+    led_blink_stat_conf.count = 1;
+    led_blink_stat_conf.pause = 10000;
+    led_blink_stat_conf.timeout = 100;
+    // xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_working", configMINIMAL_STACK_SIZE * 6, &led_blink_stat_conf, 20, NULL);
 }
 
 /// @brief Индикация при прошивке
@@ -159,12 +168,12 @@ void do_blink_led_stat_start_flashing()
 {
     do_blink_led_stop(LED_STAT);
     need_blink_stat = true;
-    led_blink_t led_blink_conf = {
-        .chan = LED_STAT,
-        .count = 1,
-        .pause = 0,
-        .timeout = 200};
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_flashing", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+    led_blink_stat_conf.active = true;
+    led_blink_stat_conf.chan = LED_STAT;
+    led_blink_stat_conf.count = 1;
+    led_blink_stat_conf.pause = 0;
+    led_blink_stat_conf.timeout = 200;
+    // xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_flashing", configMINIMAL_STACK_SIZE * 6, &led_blink_stat_conf, 20, NULL);
 }
 
 /// @brief Индикация ошибки
@@ -172,12 +181,12 @@ void do_blink_led_error()
 {
     do_blink_led_stop(LED_ERR);
     need_blink_err = true;
-    led_blink_t led_blink_conf = {
-        .chan = LED_ERR,
-        .count = 4,
-        .pause = 0,
-        .timeout = 1500};
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_error", configMINIMAL_STACK_SIZE * 6, &led_blink_conf, 20, NULL);
+    led_blink_err_conf.active = true;
+    led_blink_err_conf.chan = LED_ERR;
+    led_blink_err_conf.count = 4;
+    led_blink_err_conf.pause = 0;
+    led_blink_err_conf.timeout = 1500;
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_error", configMINIMAL_STACK_SIZE * 2, &led_blink_err_conf, 20, NULL);
 }
 
 /// @brief Остановка индикации
@@ -187,24 +196,33 @@ void do_blink_led_stop(do_port_index_t channel)
     switch (channel)
     {
     case LED_STAT:
-        need_blink_stat = false;
+        led_blink_stat_conf.active = false;
         break;
     case LED_ERR:
-        need_blink_err = false;
+        led_blink_err_conf.active = false;
         break;
     default:
         break;
     }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 void do_blink_led_err_start(int timeout)
 {
     need_blink_err = true;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 void do_blink_led_err_stop()
 {
-    need_blink_err = false;
+    led_blink_err_conf.active = false;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
+void do_blink_led_stat_stop()
+{
+    led_blink_stat_conf.active = false;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 void do_blink_led_err_start_task(void *arg)

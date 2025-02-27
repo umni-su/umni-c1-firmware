@@ -28,6 +28,8 @@ static const char *TAG = "eth_init";
 
 TaskHandle_t ethernet_handle = NULL;
 
+static bool success = false; // Success status from init etherner task
+
 #if CONFIG_UMNI_SPI_ETHERNETS_NUM
 #define SPI_ETHERNETS_NUM CONFIG_UMNI_SPI_ETHERNETS_NUM
 #else
@@ -352,56 +354,66 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
 
 void ethernet_task(void *pvParameters)
 {
-    // Initialize Ethernet driver
-    uint8_t eth_port_cnt = 0;
-    esp_eth_handle_t *eth_handles;
-    ESP_ERROR_CHECK(ethernet_init(&eth_handles, &eth_port_cnt));
-
-    // Create default event loop that running in background
-
-    // Create instance(s) of esp-netif for Ethernet(s)
-    if (eth_port_cnt == 1)
+    while (!success)
     {
-        // Use ESP_NETIF_DEFAULT_ETH when just one Ethernet interface is used and you don't need to modify
-        // default esp-netif configuration parameters.
-        esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
-        esp_netif_t *eth_netif = esp_netif_new(&cfg);
-        // Attach Ethernet driver to TCP/IP stack
-        ESP_ERROR_CHECK(esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handles[0])));
-    }
-    else
-    {
-        // Use ESP_NETIF_INHERENT_DEFAULT_ETH when multiple Ethernet interfaces are used and so you need to modify
-        // esp-netif configuration parameters for each interface (name, priority, etc.).
-        esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
-        esp_netif_config_t cfg_spi = {
-            .base = &esp_netif_config,
-            .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH};
-        char if_key_str[10];
-        char if_desc_str[10];
-        char num_str[3];
-        for (int i = 0; i < eth_port_cnt; i++)
+        esp_err_t res = ESP_FAIL;
+        // Initialize Ethernet driver
+        uint8_t eth_port_cnt = 0;
+        esp_eth_handle_t *eth_handles;
+        res = ethernet_init(&eth_handles, &eth_port_cnt);
+
+        // Create default event loop that running in background
+
+        // Create instance(s) of esp-netif for Ethernet(s)
+        if (res == ESP_OK && eth_port_cnt == 1)
         {
-            itoa(i, num_str, 10);
-            strcat(strcpy(if_key_str, "ETH_"), num_str);
-            strcat(strcpy(if_desc_str, "eth"), num_str);
-            esp_netif_config.if_key = if_key_str;
-            esp_netif_config.if_desc = if_desc_str;
-            esp_netif_config.route_prio -= i * 5;
-            esp_netif_t *eth_netif = esp_netif_new(&cfg_spi);
-
+            // Use ESP_NETIF_DEFAULT_ETH when just one Ethernet interface is used and you don't need to modify
+            // default esp-netif configuration parameters.
+            esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
+            esp_netif_t *eth_netif = esp_netif_new(&cfg);
             // Attach Ethernet driver to TCP/IP stack
-            ESP_ERROR_CHECK(esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handles[i])));
+            res = esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handles[0]));
         }
-    }
+        else
+        {
+            // Use ESP_NETIF_INHERENT_DEFAULT_ETH when multiple Ethernet interfaces are used and so you need to modify
+            // esp-netif configuration parameters for each interface (name, priority, etc.).
+            esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
+            esp_netif_config_t cfg_spi = {
+                .base = &esp_netif_config,
+                .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH};
+            char if_key_str[10];
+            char if_desc_str[10];
+            char num_str[3];
+            for (int i = 0; i < eth_port_cnt; i++)
+            {
+                itoa(i, num_str, 10);
+                strcat(strcpy(if_key_str, "ETH_"), num_str);
+                strcat(strcpy(if_desc_str, "eth"), num_str);
+                esp_netif_config.if_key = if_key_str;
+                esp_netif_config.if_desc = if_desc_str;
+                esp_netif_config.route_prio -= i * 5;
+                esp_netif_t *eth_netif = esp_netif_new(&cfg_spi);
 
-    // Register user defined event handers
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
+                // Attach Ethernet driver to TCP/IP stack
+                res = esp_netif_attach(eth_netif, esp_eth_new_netif_glue(eth_handles[i]));
+            }
+        }
 
-    // Start Ethernet driver state machine
-    for (int i = 0; i < eth_port_cnt; i++)
-    {
-        ESP_ERROR_CHECK(esp_eth_start(eth_handles[i]));
+        if (res == ESP_OK)
+        {
+            // Register user defined event handers
+            res = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL);
+
+            // Start Ethernet driver state machine
+            for (int i = 0; i < eth_port_cnt; i++)
+            {
+                res = esp_eth_start(eth_handles[i]);
+            }
+
+            success = true;
+        }
+        vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
 
     vTaskDelete(NULL);

@@ -19,6 +19,7 @@
 #include "../components/systeminfo/systeminfo.h"
 #include "../components/config/config.h"
 #include "../components/mosquitto/mosquitto.h"
+#include "../components/ota/ota.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 
@@ -82,10 +83,13 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             um_nvs_write_str(NVS_KEY_ETH_MAC, mac);
             break;
         case EV_ETH_GOT_IP:
-            //
+            do_blink_led_stat_stop();
+            ESP_LOGI(TAG, "Ethernet got ip success!");
+            do_blink_led_stat_start_working();
+            um_ota_mark_valid();
             break;
-        case IP_EVENT_ETH_GOT_IP:
-        case IP_EVENT_STA_GOT_IP:
+
+        case IP_EVENT_ETH_GOT_IP | IP_EVENT_STA_GOT_IP:
             // Start webserver ONCE
             if (!webserver_started)
             {
@@ -97,6 +101,14 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
                 um_mqtt_init();
             }
             break;
+
+        case ETHERNET_EVENT_CONNECTED:
+            do_blink_led_err_stop();
+            break;
+
+        case ETHERNET_EVENT_DISCONNECTED:
+            // do_blink_led_error();
+            break;
         default:
             break;
         }
@@ -106,7 +118,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
 void app_main(void)
 {
 
-    ESP_LOGI(TAG, "!Starting load UMNI firmware!");
+    ESP_LOGI(TAG, "\r\nStarting load UMNI firmware at version: %s \r\n", CONFIG_APP_PROJECT_VER);
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_any_event, NULL));
     ESP_ERROR_CHECK(esp_netif_init());

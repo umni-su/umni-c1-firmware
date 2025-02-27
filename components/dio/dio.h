@@ -43,9 +43,10 @@ typedef enum
 typedef struct
 {
     di_port_index_t chan;
-    int timeout;
-    int count;
-    int pause;
+    bool active;
+    short int timeout;
+    short int count;
+    short int pause;
 } led_blink_t;
 
 esp_err_t init_do();
@@ -65,6 +66,10 @@ void do_blink_led_error();
 void do_blink_led_start_task(void *arg);
 
 void do_blink_led_stop(do_port_index_t channel);
+
+void do_blink_led_err_stop();
+
+void do_blink_led_stat_stop();
 
 esp_err_t do_register_events();
 

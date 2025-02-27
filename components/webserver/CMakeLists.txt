@@ -8,6 +8,7 @@ idf_component_register(SRCS "webserver.c" "rest_server.c"
                         nvs 
                         json 
                         ntc_driver
+                        ota
                        INCLUDE_DIRS ".")
 if(CONFIG_EXAMPLE_WEB_DEPLOY_SF)
     set(WEB_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data/")
