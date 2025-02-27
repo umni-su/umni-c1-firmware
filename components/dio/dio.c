@@ -36,6 +36,16 @@ esp_err_t do_set_nvs_state()
     return um_nvs_write_i8(NVS_KEY_RELAYS, output_data);
 }
 
+esp_err_t do_set_all_ff()
+{
+    return pcf8574_port_write(&pcf8574_output_dev_t, 0xff);
+}
+
+esp_err_t do_restore_all_values()
+{
+    return pcf8574_port_write(&pcf8574_output_dev_t, output_data);
+}
+
 esp_err_t init_do()
 {
     esp_err_t res = ESP_OK;
@@ -51,6 +61,7 @@ esp_err_t init_do()
         do_blink_led_stat_start_at_boot();
         // Init led err
         do_blink_led_err_init();
+
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }
     else
@@ -112,7 +123,7 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
 /// @param arg
 void do_blink_led_start_task(void *arg)
 {
-    while (need_blink_stat)
+    while (true)
     {
         led_blink_t *led_blink_conf = (led_blink_t *)arg;
         int timeout = led_blink_conf->timeout;
@@ -142,8 +153,14 @@ void do_blink_led_start_task(void *arg)
 
 void do_blink_led_err_init()
 {
-    do_blink_led_stop(LED_ERR);
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_err", configMINIMAL_STACK_SIZE, &led_blink_err_conf, 1, NULL);
+    do_blink_led_err_stop();
+    need_blink_stat = true;
+    led_blink_err_conf.active = false;
+    led_blink_err_conf.chan = LED_ERR;
+    led_blink_err_conf.count = 2;
+    led_blink_err_conf.pause = 0;
+    led_blink_err_conf.timeout = 1000;
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_err", configMINIMAL_STACK_SIZE * 2, &led_blink_err_conf, 1, NULL);
 }
 
 /// @brief Индикация загрузки при включении
@@ -156,12 +173,13 @@ void do_blink_led_stat_start_at_boot()
     led_blink_stat_conf.count = 2;
     led_blink_stat_conf.pause = 0;
     led_blink_stat_conf.timeout = 1000;
-    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat", configMINIMAL_STACK_SIZE, &led_blink_stat_conf, 1, NULL);
+    xTaskCreate(do_blink_led_start_task, "do_blink_led_stat", configMINIMAL_STACK_SIZE * 2, &led_blink_stat_conf, 1, NULL);
 }
 
 /// @brief Индикация нормального режима работы
 void do_blink_led_stat_start_working()
 {
+    do_blink_led_stop(LED_ERR);
     do_blink_led_stop(LED_STAT);
     need_blink_stat = true;
     led_blink_stat_conf.active = true;
@@ -169,20 +187,19 @@ void do_blink_led_stat_start_working()
     led_blink_stat_conf.count = 1;
     led_blink_stat_conf.pause = 10000;
     led_blink_stat_conf.timeout = 100;
-    // xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_working", configMINIMAL_STACK_SIZE * 6, &led_blink_stat_conf, 20, NULL);
 }
 
 /// @brief Индикация при прошивке
 void do_blink_led_stat_start_flashing()
 {
     do_blink_led_stop(LED_STAT);
+    do_blink_led_stop(LED_ERR);
     need_blink_stat = true;
     led_blink_stat_conf.active = true;
     led_blink_stat_conf.chan = LED_STAT;
     led_blink_stat_conf.count = 1;
     led_blink_stat_conf.pause = 0;
-    led_blink_stat_conf.timeout = 200;
-    // xTaskCreate(do_blink_led_start_task, "do_blink_led_stat_start_flashing", configMINIMAL_STACK_SIZE * 6, &led_blink_stat_conf, 20, NULL);
+    led_blink_stat_conf.timeout = 150;
 }
 
 /// @brief Индикация ошибки
@@ -216,7 +233,7 @@ void do_blink_led_stop(do_port_index_t channel)
 
 void do_blink_led_err_start(int timeout)
 {
-    need_blink_err = true;
+    led_blink_err_conf.active = true;
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 

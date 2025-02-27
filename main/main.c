@@ -102,6 +102,16 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case ETHERNET_EVENT_DISCONNECTED:
             do_blink_led_error();
             break;
+
+        case EV_OTA_START:
+            do_blink_led_stat_start_flashing();
+            break;
+        case EV_OTA_SUCCESS:
+            esp_restart();
+            break;
+        case EV_OTA_ABORT:
+            do_blink_led_stat_start_working();
+            break;
         default:
             break;
         }

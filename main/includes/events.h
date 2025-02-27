@@ -45,6 +45,7 @@ extern "C"
         EV_STATUS_CHANGED_DI,
         EV_STATUS_CHANGED_DO,
         EV_STATUS_CHANGED_NTC,
+        EV_OTA_START,
         EV_OTA_SUCCESS,
         EV_OTA_ABORT
     };

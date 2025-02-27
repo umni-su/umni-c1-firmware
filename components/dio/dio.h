@@ -57,6 +57,10 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level);
 
 void do_blink_led_err_init();
 
+esp_err_t do_restore_all_values();
+
+esp_err_t do_set_all_ff();
+
 void do_blink_led_stat_start_at_boot();
 
 void do_blink_led_stat_start_working();

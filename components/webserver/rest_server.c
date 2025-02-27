@@ -681,8 +681,15 @@ esp_err_t adm_update(httpd_req_t *req)
     if (url != NULL)
     {
         um_ota_init();
+        success = true;
     }
     cJSON_AddBoolToObject(response, "success", success);
+    char *json = cJSON_PrintUnformatted(response);
+    httpd_resp_sendstr(req, json);
+
+    free((void *)json);
+    cJSON_Delete(root);
+    cJSON_Delete(response);
     return ESP_OK;
 }
 
@@ -795,6 +802,14 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_settings_save,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_settings_post_uri);
+
+    // adm/settings get
+    httpd_uri_t adm_update_uri = {
+        .uri = "/adm/update",
+        .method = HTTP_POST,
+        .handler = adm_update,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_update_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

@@ -26,6 +26,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         {
         case ESP_HTTPS_OTA_START:
             ESP_LOGI(OTA_TAG, "OTA started");
+            esp_event_post(APP_EVENTS, EV_OTA_START, NULL, sizeof(NULL), portMAX_DELAY);
             break;
         case ESP_HTTPS_OTA_CONNECTED:
             ESP_LOGI(OTA_TAG, "Connected to server");
@@ -51,6 +52,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
             break;
         case ESP_HTTPS_OTA_ABORT:
             ESP_LOGI(OTA_TAG, "OTA abort");
+            esp_event_post(APP_EVENTS, EV_OTA_ABORT, NULL, sizeof(NULL), portMAX_DELAY);
             break;
         }
     }
@@ -104,6 +106,7 @@ void um_ota_start_upgrade_task()
     if (err != ESP_OK)
     {
         ESP_LOGE(OTA_TAG, "ESP HTTPS OTA Begin failed");
+        esp_event_post(APP_EVENTS, EV_OTA_ABORT, NULL, sizeof(NULL), portMAX_DELAY);
         vTaskDelete(NULL);
     }
 
