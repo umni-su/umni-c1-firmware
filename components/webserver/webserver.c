@@ -19,47 +19,9 @@ static const char *WEBSERVER_TAG = "webserver";
 /* IMPORT METHODS FROM REST_SERVER */
 esp_err_t start_rest_server(const char *base_path);
 
+void um_mdns_prepare(void);
+
 /* END IMPORT METHODS FROM REST_SERVER */
-
-static esp_err_t s_example_write_file(const char *path, char *data)
-{
-    ESP_LOGI(WEBSERVER_TAG, "Opening file %s", path);
-    FILE *f = fopen(path, "w");
-    if (f == NULL)
-    {
-        ESP_LOGE(WEBSERVER_TAG, "Failed to open file for writing");
-        return ESP_FAIL;
-    }
-    // fprintf(f, data);
-    fclose(f);
-    ESP_LOGI(WEBSERVER_TAG, "File written");
-
-    return ESP_OK;
-}
-
-static esp_err_t s_example_read_file(const char *path)
-{
-    ESP_LOGI(WEBSERVER_TAG, "Reading file %s", path);
-    FILE *f = fopen(path, "r");
-    if (f == NULL)
-    {
-        ESP_LOGE(WEBSERVER_TAG, "Failed to open file for reading");
-        return ESP_FAIL;
-    }
-    char line[300];
-    fgets(line, sizeof(line), f);
-    fclose(f);
-
-    // strip newline
-    char *pos = strchr(line, '\n');
-    if (pos)
-    {
-        *pos = '\0';
-    }
-    ESP_LOGI(WEBSERVER_TAG, "Read from file: '%s'", line);
-
-    return ESP_OK;
-}
 
 void webserver_start_task(void *args)
 {

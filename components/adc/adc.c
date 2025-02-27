@@ -119,9 +119,9 @@ void init_adc()
     }
     else
     {
-        xTaskCreatePinnedToCore(ntc_queue_task, "ntc1_task", 4096, (void *)ntc_chan_1_handle, 10, &ntc_task_handle, 1);
+        xTaskCreatePinnedToCore(ntc_queue_task, "ntc1_task", 4096, (void *)ntc_chan_1_handle, 3, &ntc_task_handle, 1);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        xTaskCreatePinnedToCore(ntc_queue_task, "ntc2_task", 4096, (void *)ntc_chan_2_handle, 10, &ntc_task_handle, 1);
+        xTaskCreatePinnedToCore(ntc_queue_task, "ntc2_task", 4096, (void *)ntc_chan_2_handle, 3, &ntc_task_handle, 1);
     }
 
     // vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);

@@ -9,16 +9,26 @@ dependencies:
       registry_url: https://components.espressif.com
       type: service
     version: 0.5.3
+  espressif/mdns:
+    component_hash: fe546a92ee741cfabf2c2bb52c9024314e1d0ad32b44794f45323a0ecf1543d7
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.7.0
   espressif/ntc_driver:
     component_hash: 9f263658e8024a2fd1cd784efc345da12522fd72108143bf2b27fc36df0198f1
     dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
       require: private
       version: 0.*
-    - name: idf
-      require: private
-      version: '>=5.0'
     source:
       registry_url: https://components.espressif.com/
       type: service
@@ -28,8 +38,9 @@ dependencies:
       type: idf
     version: 5.4.0
 direct_dependencies:
+- espressif/mdns
 - espressif/ntc_driver
 - idf
-manifest_hash: 2324ddf338e03a8ccc5eca8b425831becce85398250e04776f2bb6d5a37b346d
+manifest_hash: 6074d28528889967f4cc8fdf1f60899891f58ae7444f71430ba775a9b8184716
 target: esp32
 version: 2.0.0

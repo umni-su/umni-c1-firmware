@@ -44,7 +44,9 @@ extern "C"
         EV_NTP_SYNC_SUCCESS,
         EV_STATUS_CHANGED_DI,
         EV_STATUS_CHANGED_DO,
-        EV_STATUS_CHANGED_NTC
+        EV_STATUS_CHANGED_NTC,
+        EV_OTA_SUCCESS,
+        EV_OTA_ABORT
     };
 
 #ifdef __cplusplus

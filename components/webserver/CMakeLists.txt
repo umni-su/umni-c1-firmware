@@ -8,6 +8,7 @@ idf_component_register(SRCS "webserver.c" "rest_server.c"
                         nvs 
                         json 
                         ntc_driver
+                        mdns_service
                         ota
                        INCLUDE_DIRS ".")
 if(CONFIG_EXAMPLE_WEB_DEPLOY_SF)

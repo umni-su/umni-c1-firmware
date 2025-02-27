@@ -150,7 +150,7 @@ void init_opentherm()
     ot_data.ottbsp = targetCHTemp;
     ot_data.otch = enableCentralHeating;
 
-    xTaskCreate(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &otHandle);
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &otHandle, 1);
 }
 
 um_ot_data_t um_ot_get_data()

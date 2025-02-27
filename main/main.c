@@ -22,7 +22,6 @@
 #include "../components/ota/ota.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
-
 #include "../components/opentherm/opentherm_operations.h"
 
 static const char *TAG = "main";
@@ -47,9 +46,6 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case EV_SDCARD_MOUNTED:
             um_config_init();
             break;
-        case EV_ONEWIRE_INIT:
-
-            break;
         case EV_CONFIGURATION_READY:
             webserver_start();
             //  Инициализируем входы при инициализации NVS
@@ -59,16 +55,13 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             break;
         case EV_NVS_OPENED:
             ethernet_start();
-
             break;
         case EV_SYSTEM_INSTALLED:
 
+            do_blink_led_stat_start_working();
             um_systeminfo_init();
-
             init_opentherm();
-
             init_adc();
-
             onewire_init_config();
             break;
 
@@ -107,7 +100,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             break;
 
         case ETHERNET_EVENT_DISCONNECTED:
-            // do_blink_led_error();
+            do_blink_led_error();
             break;
         default:
             break;

@@ -65,7 +65,7 @@ esp_err_t um_config_init()
     {
         ESP_LOGE(CONFIG_TAG, "Failed to read mac_name. Check ESP_MAC_USE_CUSTOM_MAC_AS_BASE_MAC in config!");
     }
-    xTaskCreate(um_config_create_config_file_sensors, "um_config_init_dio", configMINIMAL_STACK_SIZE * 4, NULL, 20, NULL);
+    xTaskCreate(um_config_create_config_file_sensors, "um_config_init_dio", configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
     return ESP_OK;
 }
 

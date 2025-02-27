@@ -55,6 +55,8 @@ do_level_t do_get_level(do_port_index_t channel);
 
 esp_err_t do_set_level(do_port_index_t channel, do_level_t level);
 
+void do_blink_led_err_init();
+
 void do_blink_led_stat_start_at_boot();
 
 void do_blink_led_stat_start_working();

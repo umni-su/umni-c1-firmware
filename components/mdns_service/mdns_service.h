@@ -1,0 +1,1 @@
+void um_mdns_prepare(void);

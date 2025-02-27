@@ -76,7 +76,7 @@ void um_systeminfo_task(void *arg)
 
 void time_sync_notification_cb(struct timeval *tv)
 {
-    xTaskCreatePinnedToCore(um_systeminfo_task, "systeminfo", 4095, NULL, 10, &systeminfo_task_handle, 1);
+    xTaskCreatePinnedToCore(um_systeminfo_task, "systeminfo", configMINIMAL_STACK_SIZE * 2, NULL, 3, &systeminfo_task_handle, 1);
 
     ESP_LOGW(TAG, "Notification of a time synchronization event");
     um_nvs_write_str(NVS_KEY_RESET_AT, um_systeminfo_get_date());

@@ -32,6 +32,7 @@
 #include "../dio/dio.h"
 #include "../adc/adc.h"
 #include "../ota/ota.h"
+#include "../mdns_service/mdns_service.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
 
@@ -620,18 +621,18 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
 
     if (strcmp(type, "api") == 0)
     {
-        int mqen = cJSON_GetObjectItem(data, "mqen")->valueint;
+        short int mqen = cJSON_GetObjectItem(data, "mqen")->valueint;
         char *mqhost = cJSON_HasObjectItem(data, "mqhost") ? cJSON_GetObjectItem(data, "mqhost")->valuestring : NULL;
         int mqport = cJSON_HasObjectItem(data, "mqport") ? cJSON_GetObjectItem(data, "mqport")->valueint : 0;
         char *mquser = cJSON_HasObjectItem(data, "mquser") ? cJSON_GetObjectItem(data, "mquser")->valuestring : NULL;
         char *mqpwd = cJSON_HasObjectItem(data, "mqpwd") ? cJSON_GetObjectItem(data, "mqpwd")->valuestring : NULL;
 
-        int whk = cJSON_GetObjectItem(data, "whk")->valueint;
+        short int whk = cJSON_GetObjectItem(data, "whk")->valueint;
         char *whkurl = cJSON_HasObjectItem(data, "whkurl") ? cJSON_GetObjectItem(data, "whkurl")->valuestring : NULL;
 
         if (mqen == 1)
         {
-            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, 1);
+            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, (int8_t)1);
             if (mqhost)
                 um_nvs_write_str(NVS_KEY_MQTT_HOST, mqhost);
             if (mqport)
@@ -653,7 +654,7 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
         }
         else
         {
-            um_nvs_write_i8(NVS_KEY_MQTT_ENABLED, 0);
+            um_nvs_write_i8(NVS_KEY_WEBHOOKS, 0);
         }
     }
 
@@ -668,6 +669,23 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t adm_update(httpd_req_t *req)
+{
+    bool success = false;
+    char *data = prepare_post_buffer(req);
+    cJSON *root = cJSON_Parse(data);
+    const char *url = cJSON_HasObjectItem(root, "url") ? cJSON_GetObjectItem(root, "url")->valuestring : NULL;
+
+    cJSON *response = cJSON_CreateObject();
+
+    if (url != NULL)
+    {
+        um_ota_init();
+    }
+    cJSON_AddBoolToObject(response, "success", success);
+    return ESP_OK;
+}
+
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
 {
@@ -675,16 +693,9 @@ void free_ctx_func(void *ctx)
     free(ctx);
 }
 
-static esp_err_t adm_test(httpd_req_t *req)
-{
-    httpd_resp_set_type(req, "application/json");
-    um_ota_init();
-    httpd_resp_sendstr(req, "ok");
-    return ESP_OK;
-}
-
 esp_err_t start_rest_server(const char *base_path)
 {
+    um_mdns_prepare();
     authenticated = false;
     installed = um_nvs_is_installed();
     REST_CHECK(base_path, "wrong base path", err);
@@ -784,14 +795,6 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_settings_save,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_settings_post_uri);
-
-    // adm/settings get
-    httpd_uri_t adm_test_uri = {
-        .uri = "/adm/test",
-        .method = HTTP_GET,
-        .handler = adm_test,
-        .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &adm_test_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
