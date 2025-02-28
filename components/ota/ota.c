@@ -9,12 +9,16 @@
 
 #define CONFIG_OTA_ATTEMPTS 5
 
-// EXAMPLE
-#define URL "https://share.umni.su/f/df57ee6136b548ec86c5/?dl=1"
-
 #include "ota.h"
 
+static char path[255];
+
 const char *OTA_TAG = "ota";
+
+void um_ota_set_path(char *url)
+{
+    sprintf(path, url);
+}
 
 /* Event handler for catching system events */
 static void event_handler(void *arg, esp_event_base_t event_base,
@@ -82,14 +86,14 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
     return ESP_OK;
 }
 
-void um_ota_start_upgrade_task()
+void um_ota_start_upgrade_task(void *args)
 {
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     // Настраиваем HTTPS
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
-        .url = URL,
+        .url = path,
         .crt_bundle_attach = esp_crt_bundle_attach,
         //.timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
         .keep_alive_enable = true,
@@ -102,6 +106,8 @@ void um_ota_start_upgrade_task()
 
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
+
+    ESP_LOGW(OTA_TAG, "Start um_ota_init with URL: %s", ota_config.http_config->url);
 
     if (err != ESP_OK)
     {
@@ -157,6 +163,7 @@ void um_ota_start_upgrade_task()
             {
                 ESP_LOGE(OTA_TAG, "Image validation failed, image is corrupted");
             }
+            // free((void *)url);
             ESP_LOGE(OTA_TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
             vTaskDelete(NULL);
         }
@@ -168,12 +175,21 @@ ota_end:
     vTaskDelete(NULL);
 }
 
-void um_ota_init()
+void um_ota_init(char *url)
 {
-    xTaskCreate(&um_ota_start_upgrade_task, "ota", 1024 * 8, NULL, 3, NULL);
+    um_ota_set_path(url);
+    xTaskCreate(um_ota_start_upgrade_task, "ota", configMINIMAL_STACK_SIZE * 8, NULL, 12, NULL);
 }
 
 void um_ota_mark_valid()
 {
-    esp_ota_mark_app_valid_cancel_rollback();
+    const esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+    if (err == ESP_OK)
+    {
+        ESP_LOGI(OTA_TAG, "esp_ota_mark_app_valid_cancel_rollback SUCCESS");
+    }
+    else
+    {
+        ESP_LOGE(OTA_TAG, "esp_ota_mark_app_valid_cancel_rollback FAILED %s", esp_err_to_name(err));
+    }
 }

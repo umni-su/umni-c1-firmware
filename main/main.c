@@ -40,7 +40,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
 {
     if ((int)id != 6)
     { // 6 == webserver read chunk
-        ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
+        // ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
         switch (id)
         {
         case EV_SDCARD_MOUNTED:
@@ -57,12 +57,12 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             ethernet_start();
             break;
         case EV_SYSTEM_INSTALLED:
-
             do_blink_led_stat_start_working();
             um_systeminfo_init();
             init_opentherm();
             init_adc();
             onewire_init_config();
+            um_ota_mark_valid();
             break;
 
         case EV_NTP_SYNC_SUCCESS:
@@ -79,7 +79,6 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             do_blink_led_stat_stop();
             ESP_LOGI(TAG, "Ethernet got ip success!");
             do_blink_led_stat_start_working();
-            um_ota_mark_valid();
             break;
 
         case IP_EVENT_ETH_GOT_IP | IP_EVENT_STA_GOT_IP:

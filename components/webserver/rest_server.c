@@ -674,13 +674,13 @@ esp_err_t adm_update(httpd_req_t *req)
     bool success = false;
     char *data = prepare_post_buffer(req);
     cJSON *root = cJSON_Parse(data);
-    const char *url = cJSON_HasObjectItem(root, "url") ? cJSON_GetObjectItem(root, "url")->valuestring : NULL;
+    char *url = cJSON_HasObjectItem(root, "url") ? cJSON_GetObjectItem(root, "url")->valuestring : NULL;
 
     cJSON *response = cJSON_CreateObject();
 
     if (url != NULL)
     {
-        um_ota_init();
+        um_ota_init(url);
         success = true;
     }
     cJSON_AddBoolToObject(response, "success", success);
