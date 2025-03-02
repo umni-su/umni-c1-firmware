@@ -2,7 +2,7 @@ menu "UMNI NVS"
 
     config UMNI_NVS_HOSTNAME
         string "Имя хоста"
-        default "umni-c-one.local"
+        default "umni-c-one"
         help
             Укажите имя хоста (используется для MDNS, NETIF служб).
             

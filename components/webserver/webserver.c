@@ -30,7 +30,7 @@ void webserver_start_task(void *args)
 // ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_SD_MOUNT_POINT CONFIG_UMNI_WEB_MOUNT_POINT));
 #if CONFIG_UMNI_WEB_DEPLOY_SD
     ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_SD_MOUNT_POINT CONFIG_UMNI_WEB_MOUNT_POINT));
-#else if CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
+#elif CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
     ESP_ERROR_CHECK(start_rest_server("/www"));
 #endif
     //   ESP_ERROR_CHECK(start_rest_server(CONFIG_UMNI_WEB_MOUNT_POINT"/www"));

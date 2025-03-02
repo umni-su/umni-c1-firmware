@@ -70,7 +70,6 @@ esp_err_t initialize_ntc_channels()
 
 void ntc_queue_task(void *arg)
 {
-    esp_err_t res = ESP_OK;
     ntc_device_handle_t handle = (ntc_device_handle_t)arg;
     analog_inputs_t chan;
     int index = 0;
@@ -94,10 +93,6 @@ void ntc_queue_task(void *arg)
                 .channel = chan,
                 .temp = temp};
             esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
-        }
-        else
-        {
-            res = ESP_FAIL;
         }
         vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);
     }

@@ -692,6 +692,36 @@ esp_err_t adm_update(httpd_req_t *req)
     cJSON_Delete(response);
     return ESP_OK;
 }
+/** Restart device from web */
+esp_err_t adm_reboot(httpd_req_t *req)
+{
+    cJSON *res = cJSON_CreateObject();
+    cJSON_AddBoolToObject(res, "success", true);
+    char *json = cJSON_PrintUnformatted(res);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(res);
+    do_set_all_ff();
+    esp_restart();
+    return ESP_OK;
+}
+
+/** FACTORY reset device from web */
+esp_err_t adm_reset(httpd_req_t *req)
+{
+    cJSON *res = cJSON_CreateObject();
+    cJSON_AddBoolToObject(res, "success", true);
+    char *json = cJSON_PrintUnformatted(res);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(res);
+    do_set_all_ff();
+    um_config_delete_config_file(CONFIG_FILE_SENSORS);
+    um_config_delete_config_file(CONFIG_FILE_ONEWIRE);
+    um_nvs_erase();
+    esp_restart();
+    return ESP_OK;
+}
 
 /* Custom function to free context */
 void free_ctx_func(void *ctx)
@@ -810,6 +840,22 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_update,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_update_uri);
+
+    // adm/reboot get
+    httpd_uri_t adm_reboot_uri = {
+        .uri = "/adm/reboot",
+        .method = HTTP_GET,
+        .handler = adm_reboot,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_reboot_uri);
+
+    // adm/reboot get
+    httpd_uri_t adm_reset_uri = {
+        .uri = "/adm/reset",
+        .method = HTTP_GET,
+        .handler = adm_reset,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_reset_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
