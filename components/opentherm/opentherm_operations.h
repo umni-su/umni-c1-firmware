@@ -20,6 +20,20 @@ typedef struct
 } um_ot_data_t;
 
 um_ot_data_t um_ot_get_data();
+
 void esp_ot_control_task_handler(void *pvParameter);
-void init_opentherm();
+
+void um_ot_init();
+
+esp_err_t um_ot_set_boiler_status(
+    bool enable_central_heating,
+    bool enable_hot_water,
+    bool enable_cooling,
+    bool enable_outside_temperature_compensation,
+    bool enable_central_heating2);
+
+void um_ot_set_boiler_temp(float temp);
+
+void um_ot_set_dhw_setpoint(float temp);
+
 void um_ot_update_state(bool otch, int otdhw, int ottbsp);
