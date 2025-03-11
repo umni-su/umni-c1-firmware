@@ -91,7 +91,7 @@ esp_err_t init_do()
                             {
                                 cJSON_ArrayForEach(val, on)
                                 {
-                                    automation_relay_config[port].on[i] = on->valueint;
+                                    automation_relay_config[port].on[i] = val->valueint;
                                     i++;
                                 }
                             }
