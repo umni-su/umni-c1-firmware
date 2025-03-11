@@ -30,6 +30,12 @@ typedef struct
     char *name;
 } um_mqtt_device_register_request_t;
 
+typedef struct
+{
+    bool success;
+    char *url;
+} um_mqtt_status_t;
+
 void um_mqtt_init();
 
 esp_err_t um_mqtt_publish_data(char *topic, char *data);
@@ -45,3 +51,5 @@ esp_err_t um_mqtt_register_device();
  * Send configuration to UMNI ECO
  */
 esp_err_t um_mqtt_send_config();
+
+um_mqtt_status_t um_mqtt_get_connection_state();

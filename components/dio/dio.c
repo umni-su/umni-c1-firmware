@@ -4,6 +4,7 @@
 
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
+#include "../config/config.h"
 
 uint8_t input_data = 0xff;
 
@@ -20,6 +21,12 @@ bool need_blink_err = false;
 static led_blink_t led_blink_stat_conf;
 
 static led_blink_t led_blink_err_conf;
+
+/** DI Automation action configuration */
+di_automation_relay_config_t automation_relay_config[6] = {
+    {.ext = false,
+     .off = {-1},
+     .on = {-1}}};
 
 uint8_t do_get_nvs_state()
 {
@@ -48,6 +55,28 @@ esp_err_t do_restore_all_values()
 
 esp_err_t init_do()
 {
+    char *config_file = um_config_get_config_file_dio();
+    cJSON *config = cJSON_Parse(config_file);
+    if (cJSON_HasObjectItem(config, "di"))
+    {
+        cJSON *di_ar = cJSON_GetObjectItem(config, "di");
+        cJSON *di_el = NULL;
+
+        cJSON_ArrayForEach(di_el, di_ar)
+        {
+            short int port = cJSON_HasObjectItem(di_el, "index") ? cJSON_GetObjectItem(di_el, "index")->valueint : -1;
+            bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
+
+            if (port > 0)
+            {
+                automation_relay_config[port].ext = ext;
+            }
+        }
+    }
+
+    cJSON_Delete(config);
+    free((void *)config_file);
+
     esp_err_t res = ESP_OK;
     output_data = do_get_nvs_state();
     memset(&pcf8574_output_dev_t, 0, sizeof(i2c_dev_t));
@@ -61,6 +90,8 @@ esp_err_t init_do()
         do_blink_led_stat_start_at_boot();
         // Init led err
         do_blink_led_err_init();
+
+        // esp_log_set_default_level();
 
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
     }

@@ -1,6 +1,9 @@
 #include "esp_log.h"
 #include "opentherm.h"
+#include "esp_event.h"
 #include "opentherm_operations.h"
+
+#include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 
 #define OT_IN_PIN 32
@@ -21,7 +24,9 @@ static const char *TAG = "OPENTHERM";
 
 static um_ot_data_t ot_data;
 
-TaskHandle_t otHandle = NULL;
+TaskHandle_t ot_handle = NULL;
+
+open_therm_response_status_t ot_response_status;
 
 bool is_busy = false;
 
@@ -34,16 +39,16 @@ void esp_ot_control_task_handler(void *pvParameter)
     targetCHTemp = um_nvs_read_i8(NVS_KEY_OT_TB_SETPOINT);
     enableCentralHeating = um_nvs_read_i8(NVS_KEY_OT_ENABLED) == 1;
 
-    esp_err_t res = um_ot_set_boiler_status(
-        enableCentralHeating,
-        enableHotWater, enableCooling,
-        enableOutsideTemperatureCompensation,
-        enableCentralHeating2);
-    um_ot_set_boiler_temp(targetCHTemp);
-    um_ot_set_boiler_temp(targetDHWTemp);
-
     while (true)
     {
+        esp_err_t res = um_ot_set_boiler_status(
+            enableCentralHeating,
+            enableHotWater, enableCooling,
+            enableOutsideTemperatureCompensation,
+            enableCentralHeating2);
+        um_ot_set_boiler_temp(targetCHTemp);
+        um_ot_set_dhw_setpoint(targetDHWTemp);
+
         if (res != ESP_OK)
         {
             ESP_LOGE(TAG, "Opentherm um_ot_set_boiler_status return ESP_FAIL, retry...");
@@ -54,7 +59,7 @@ void esp_ot_control_task_handler(void *pvParameter)
                 enableCentralHeating2);
             um_ot_set_boiler_temp(targetCHTemp);
             um_ot_set_boiler_temp(targetDHWTemp);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
         if (!is_busy)
@@ -65,9 +70,9 @@ void esp_ot_control_task_handler(void *pvParameter)
             ESP_LOGI(TAG, "Free heap size before: %ld", esp_get_free_heap_size());
             ESP_LOGI(TAG, "NVS OT values - ch: %d, dhwsp: %d tbsp: %d", enableCentralHeating, targetDHWTemp, targetCHTemp);
 
-            open_therm_response_status_t esp_ot_response_status = esp_ot_get_last_response_status();
+            ot_response_status = esp_ot_get_last_response_status();
 
-            if (esp_ot_response_status == OT_STATUS_SUCCESS)
+            if (ot_response_status == OT_STATUS_SUCCESS)
             {
                 const float modulation = esp_ot_get_modulation();
                 const float pressure = esp_ot_get_pressure();
@@ -77,7 +82,7 @@ void esp_ot_control_task_handler(void *pvParameter)
                 const float chTemp = esp_ot_get_boiler_temperature();
                 const float retTemp = esp_ot_get_return_temperature();
 
-                ot_data.status = esp_ot_response_status;
+                ot_data.status = ot_response_status;
                 ot_data.otch = enableCentralHeating;
 
                 ot_data.pressure = pressure;
@@ -107,6 +112,10 @@ void esp_ot_control_task_handler(void *pvParameter)
                 ESP_LOGI(TAG, "Slave OT Version: %.1f", slave_ot_version);
                 ESP_LOGI(TAG, "Slave Version: %08lX", slave_product_version);
             }
+            else
+            {
+                ESP_LOGW(TAG, "Error readingg %d", ot_response_status);
+            }
 
             if (fault)
             {
@@ -119,7 +128,7 @@ void esp_ot_control_task_handler(void *pvParameter)
             is_busy = false;
         }
 
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }
@@ -131,32 +140,44 @@ esp_err_t um_ot_set_boiler_status(
     bool enable_outside_temperature_compensation,
     bool enable_central_heating2)
 {
+    // vTaskSuspend(ot_handle);
+
+    enableCentralHeating = enable_central_heating;
+    enableHotWater = enable_hot_water;
+    enableCooling = enable_cooling;
+    enableOutsideTemperatureCompensation = enable_outside_temperature_compensation;
+    enableCentralHeating2 = enable_central_heating2;
+
+    um_nvs_write_i8(NVS_KEY_OT_ENABLED, (int)enableCentralHeating);
+    ot_data.otch = (int)enableCentralHeating;
+
     esp_err_t res = ESP_OK;
     status = esp_ot_set_boiler_status(
         enableCentralHeating,
-        enableHotWater, enableCooling,
+        enableHotWater,
+        enableCooling,
         enableOutsideTemperatureCompensation,
         enableCentralHeating2);
 
-    open_therm_response_status_t esp_ot_response_status = esp_ot_get_last_response_status();
-    if (esp_ot_response_status == OT_STATUS_SUCCESS)
+    ot_response_status = esp_ot_get_last_response_status();
+    if (ot_response_status == OT_STATUS_SUCCESS)
     {
         ot_data.central_heating_active = esp_ot_is_central_heating_active(status);
         ot_data.hot_water_active = esp_ot_is_hot_water_active(status);
         ot_data.flame_on = esp_ot_is_flame_on(status);
         ot_data.is_fault = esp_ot_is_fault(status);
     }
-    else if (esp_ot_response_status == OT_STATUS_TIMEOUT)
+    else if (ot_response_status == OT_STATUS_TIMEOUT)
     {
         res = ESP_FAIL;
         ESP_LOGE(TAG, "OT Communication Timeout");
     }
-    else if (esp_ot_response_status == OT_STATUS_INVALID)
+    else if (ot_response_status == OT_STATUS_INVALID)
     {
         res = ESP_FAIL;
         ESP_LOGE(TAG, "OT Communication Invalid");
     }
-    else if (esp_ot_response_status == OT_STATUS_NONE)
+    else if (ot_response_status == OT_STATUS_NONE)
     {
         res = ESP_FAIL;
         ESP_LOGE(TAG, "OpenTherm not initialized");
@@ -166,6 +187,8 @@ esp_err_t um_ot_set_boiler_status(
         res = ESP_FAIL;
     }
 
+    // vTaskResume(ot_handle);
+
     return res;
 }
 
@@ -173,8 +196,8 @@ esp_err_t um_ot_set_boiler_status(
 void um_ot_set_boiler_temp(float temp)
 {
     vTaskDelay(10 / portTICK_PERIOD_MS);
-    open_therm_response_status_t esp_ot_response_status = esp_ot_get_last_response_status();
-    if (esp_ot_response_status == OT_STATUS_SUCCESS)
+    ot_response_status = esp_ot_get_last_response_status();
+    if (ot_response_status == OT_STATUS_SUCCESS)
     {
         targetCHTemp = temp;
         um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, targetCHTemp);
@@ -186,8 +209,8 @@ void um_ot_set_boiler_temp(float temp)
 void um_ot_set_dhw_setpoint(float temp)
 {
     vTaskDelay(10 / portTICK_PERIOD_MS);
-    open_therm_response_status_t esp_ot_response_status = esp_ot_get_last_response_status();
-    if (esp_ot_response_status == OT_STATUS_SUCCESS)
+    ot_response_status = esp_ot_get_last_response_status();
+    if (ot_response_status == OT_STATUS_SUCCESS)
     {
         targetDHWTemp = temp;
         um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, temp);
@@ -225,7 +248,7 @@ void um_ot_init()
     ot_data.ottbsp = targetCHTemp;
     ot_data.otch = enableCentralHeating;
 
-    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &otHandle, 1);
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &ot_handle, 1);
 }
 
 um_ot_data_t um_ot_get_data()
@@ -257,9 +280,21 @@ void um_ot_update_state(bool otch, int otdhwsp, int ottbsp)
     //     enableHotWater, enableCooling,
     //     enableOutsideTemperatureCompensation,
     //     enableCentralHeating2);
-    um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, otdhwsp);
-    um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, ottbsp);
-    um_nvs_write_i8(NVS_KEY_OT_ENABLED, otch);
+    // um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, otdhwsp);
+    // um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, ottbsp);
+    // um_nvs_write_i8(NVS_KEY_OT_ENABLED, otch);
 
-    ESP_LOGI(TAG, "otch: %d  otdhwsp: %d ottbsp:%d", otch, otdhwsp, ottbsp);
+    um_ot_set_boiler_temp(ottbsp);
+    um_ot_set_dhw_setpoint(otdhwsp);
+
+    esp_err_t res = um_ot_set_boiler_status(
+        enableCentralHeating,
+        enableHotWater, enableCooling,
+        enableOutsideTemperatureCompensation,
+        enableCentralHeating2);
+
+    if (res == ESP_OK)
+    {
+        ESP_LOGI(TAG, "otch: %d  otdhwsp: %d ottbsp:%d", otch, otdhwsp, ottbsp);
+    }
 }

@@ -56,6 +56,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case EV_NVS_OPENED:
             ethernet_start();
             break;
+
         case EV_SYSTEM_INSTALLED:
             do_blink_led_stat_start_working();
             um_systeminfo_init();

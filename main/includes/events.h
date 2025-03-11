@@ -47,7 +47,8 @@ extern "C"
         EV_STATUS_CHANGED_NTC,
         EV_OTA_START,
         EV_OTA_SUCCESS,
-        EV_OTA_ABORT
+        EV_OTA_ABORT,
+        EV_OT_SET_DATA
     };
 
 #ifdef __cplusplus

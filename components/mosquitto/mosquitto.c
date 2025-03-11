@@ -24,6 +24,10 @@ int msg_id;
 esp_mqtt_event_handle_t event = NULL;
 esp_mqtt_client_handle_t client = NULL;
 
+static um_mqtt_status_t connection_status;
+
+bool success = false;
+
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0)
@@ -84,6 +88,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         um_mqtt_register_device();
 
+        um_mqtt_send_config();
+
         // SUBSCRIBE HERE!
 
         // msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
@@ -133,6 +139,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(MQTT_TAG, "Other event id:%d", event->event_id);
         break;
     }
+
+    connection_status.success = connected;
 }
 
 void um_mqtt_init()
@@ -150,7 +158,10 @@ void um_mqtt_init()
     port = um_nvs_read_i16(NVS_KEY_MQTT_PORT);
     username = um_nvs_read_str(NVS_KEY_MQTT_USER);
     password = um_nvs_read_str(NVS_KEY_MQTT_PWD);
-    if (port == -1)
+
+    connection_status.url = url;
+
+    if (port < 1)
     {
         port = 1883;
     }
@@ -242,4 +253,9 @@ esp_err_t um_mqtt_send_config()
     cJSON_Delete(json_config);
 
     return ESP_OK;
+}
+
+um_mqtt_status_t um_mqtt_get_connection_state()
+{
+    return connection_status;
 }

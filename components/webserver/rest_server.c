@@ -32,6 +32,7 @@
 #include "../dio/dio.h"
 #include "../adc/adc.h"
 #include "../ota/ota.h"
+#include "../mosquitto/mosquitto.h"
 #include "../mdns_service/mdns_service.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
@@ -226,6 +227,15 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "chip", info.chip);
     cJSON_AddNumberToObject(root, "cores", info.cores);
     cJSON_AddNumberToObject(root, "revision", info.model);
+    bool whken = um_nvs_read_i8(NVS_KEY_WEBHOOKS) == 1;
+    cJSON_AddBoolToObject(root, "whk", whken);
+
+    um_mqtt_status_t mqtt_status = um_mqtt_get_connection_state();
+    cJSON *mqtt = cJSON_CreateObject();
+    cJSON_AddBoolToObject(mqtt, "success", mqtt_status.success);
+    cJSON_AddStringToObject(mqtt, "server", mqtt_status.url);
+
+    cJSON_AddItemToObject(root, "mqtt", mqtt);
 
     // Netif
     cJSON *netif = cJSON_CreateArray();

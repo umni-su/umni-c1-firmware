@@ -49,6 +49,22 @@ typedef struct
     short int pause;
 } led_blink_t;
 
+/** Struct DI relay automation */
+typedef struct
+{
+    bool ext;
+    di_port_index_t on[6];
+    di_port_index_t off[6];
+} di_automation_relay_config_t;
+/** END Struct DI relay automation */
+
+typedef struct
+{
+    bool ext;
+    bool ch;
+
+} di_automation_boiler_config_t;
+
 esp_err_t init_do();
 
 do_level_t do_get_level(do_port_index_t channel);
