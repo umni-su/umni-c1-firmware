@@ -345,7 +345,11 @@ void um_config_update_onewire_config_file()
         {
             ESP_LOGE(CONFIG_TAG, "Set not founded sensor %08llx inactive (active:false)", checking_addr);
         }
-        cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), exists);
+        cJSON *active = cJSON_HasObjectItem(el, "active") ? cJSON_GetObjectItem(el, "active") : NULL;
+        if (active != NULL)
+        {
+            cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), exists);
+        }
     }
 
     um_config_write_config_file(CONFIG_FILE_ONEWIRE, root);

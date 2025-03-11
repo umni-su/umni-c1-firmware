@@ -25,8 +25,8 @@ static led_blink_t led_blink_err_conf;
 /** DI Automation action configuration */
 di_automation_relay_config_t automation_relay_config[6] = {
     {.ext = false,
-     .off = {-1},
-     .on = {-1}}};
+     .off = {-1, -1, -1, -1, -1, -1},
+     .on = {-1, -1, -1, -1, -1, -1}}};
 
 uint8_t do_get_nvs_state()
 {
@@ -65,11 +65,52 @@ esp_err_t init_do()
         cJSON_ArrayForEach(di_el, di_ar)
         {
             short int port = cJSON_HasObjectItem(di_el, "index") ? cJSON_GetObjectItem(di_el, "index")->valueint : -1;
-            bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
-
-            if (port > 0)
+            if (port >= 0)
             {
-                automation_relay_config[port].ext = ext;
+                bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
+
+                // ARRAY OF OPTTIONS
+                cJSON *options = cJSON_HasObjectItem(di_el, "opt") ? cJSON_GetObjectItem(di_el, "opt") : NULL;
+
+                if (options != NULL)
+                {
+                    cJSON *opt = NULL;
+                    cJSON_ArrayForEach(opt, options)
+                    {
+                        cJSON *type = cJSON_HasObjectItem(opt, "type") ? cJSON_GetObjectItem(opt, "type") : NULL;
+
+                        if (type != NULL && type->valueint == 1) // тип автоматизации - реле
+                        {
+                            cJSON *val = NULL;
+                            cJSON *on = cJSON_GetObjectItem(opt, "on");
+                            cJSON *off = cJSON_GetObjectItem(opt, "off");
+
+                            unsigned short int i = 0;
+
+                            if (on)
+                            {
+                                cJSON_ArrayForEach(val, on)
+                                {
+                                    automation_relay_config[port].on[i] = on->valueint;
+                                    i++;
+                                }
+                            }
+
+                            i = 0;
+
+                            if (off)
+                            {
+                                cJSON_ArrayForEach(val, off)
+                                {
+                                    automation_relay_config[port].off[i] = off->valueint;
+                                    i++;
+                                }
+                            }
+
+                            automation_relay_config[port].ext = ext;
+                        }
+                    }
+                }
             }
         }
     }
@@ -327,6 +368,26 @@ void di_interrupt_task(void *arg)
             um_ev_message_dio message = {
                 .index = i,
                 .level = pin_level};
+
+            // if (pin_level == 1)
+            //{
+            ESP_LOGW("AUTO", "pin level high");
+
+            if (automation_relay_config[i].ext)
+            {
+                ESP_LOGW("AUTO", "automation_relay_config[i].ext TRUE");
+                for (int j = 0; j < 6; j++)
+                {
+                    int channel = automation_relay_config[i].on[j];
+                    if (channel >= 0)
+                    {
+                        ESP_LOGW("AUTO", "do_set_level(%d, %d);", channel, pin_level);
+                        do_set_level(channel, pin_level);
+                    }
+                }
+            }
+
+            //}
 
             esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DI, &message, sizeof(message), portMAX_DELAY);
         }

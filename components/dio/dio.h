@@ -53,8 +53,8 @@ typedef struct
 typedef struct
 {
     bool ext;
-    di_port_index_t on[6];
-    di_port_index_t off[6];
+    int on[6];
+    int off[6];
 } di_automation_relay_config_t;
 /** END Struct DI relay automation */
 
