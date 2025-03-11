@@ -22,6 +22,8 @@ static led_blink_t led_blink_stat_conf;
 
 static led_blink_t led_blink_err_conf;
 
+static uint8_t current_state;
+
 /** DI Automation action configuration */
 di_automation_relay_config_t automation_relay_config[6] = {
     {.ext = false,
@@ -97,12 +99,13 @@ esp_err_t init_do()
                             }
 
                             i = 0;
+                            val = NULL;
 
                             if (off)
                             {
                                 cJSON_ArrayForEach(val, off)
                                 {
-                                    automation_relay_config[port].off[i] = off->valueint;
+                                    automation_relay_config[port].off[i] = val->valueint;
                                     i++;
                                 }
                             }
@@ -354,13 +357,12 @@ esp_err_t init_di()
 
 void di_interrupt_task(void *arg)
 {
-    uint8_t current_state;
     pcf8574_port_read(&pcf8574_input_dev_t, &current_state);
     for (int i = 0; i < 8; i++)
     {
         int pin_level = current_state >> i & 0x01;
-        int current_pin__level = input_data >> i & 0x01;
-        if (pin_level != current_pin__level)
+        int current_pin_level = input_data >> i & 0x01;
+        if (pin_level != current_pin_level)
         {
             ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
             input_data = current_state; // set last level to input pins
@@ -378,11 +380,17 @@ void di_interrupt_task(void *arg)
                 ESP_LOGW("AUTO", "automation_relay_config[i].ext TRUE");
                 for (int j = 0; j < 6; j++)
                 {
-                    int channel = automation_relay_config[i].on[j];
-                    if (channel >= 0)
+                    // передаем нормальное состояние для группы реле на "вкл"
+                    int channel_on = automation_relay_config[i].on[j];
+                    if (channel_on >= 0)
                     {
-                        ESP_LOGW("AUTO", "do_set_level(%d, %d);", channel, pin_level);
-                        do_set_level(channel, pin_level);
+                        do_set_level(channel_on, pin_level);
+                    }
+                    // передаем инверсное состояние для группы реле на "выкл"
+                    int channel_off = automation_relay_config[i].off[j];
+                    if (channel_off >= 0)
+                    {
+                        do_set_level(channel_off, !pin_level);
                     }
                 }
             }
