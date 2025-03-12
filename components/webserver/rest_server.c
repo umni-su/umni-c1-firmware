@@ -420,7 +420,7 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
     if (strcmp(type, "dio") == 0)
     {
         success = true;
-        int index = cJSON_GetObjectItem(state, "index")->valueint;
+        int index = do_map_channel(cJSON_GetObjectItem(state, "index")->valueint);
         int value = cJSON_GetObjectItem(state, "state")->valueint;
         do_set_level(index, value);
     }

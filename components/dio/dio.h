@@ -65,6 +65,8 @@ typedef struct
 
 } di_automation_boiler_config_t;
 
+do_port_index_t do_map_channel(int channel);
+
 esp_err_t init_do();
 
 do_level_t do_get_level(do_port_index_t channel);

@@ -147,8 +147,35 @@ esp_err_t init_do()
     return res;
 }
 
+do_port_index_t do_map_channel(int channel)
+{
+    switch (channel)
+    {
+    case 0:
+        return DO_1;
+    case 1:
+        return DO_2;
+    case 2:
+        return DO_3;
+    case 3:
+        return DO_4;
+    case 4:
+        return DO_5;
+    case 5:
+        return DO_6;
+    case 6:
+        return LED_STAT;
+    case 7:
+        return LED_ERR;
+
+    default:
+        return 0;
+    }
+}
+
 do_level_t do_get_level(do_port_index_t channel)
 {
+    channel = do_map_channel(channel);
     esp_err_t res = pcf8574_port_read(&pcf8574_output_dev_t, &output_data);
     if (res == ESP_OK)
     {
@@ -164,6 +191,7 @@ do_level_t do_get_level(do_port_index_t channel)
 
 esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
 {
+    channel = do_map_channel(channel);
     if (level == DO_LOW)
     {
         output_data = output_data | (1 << channel);
