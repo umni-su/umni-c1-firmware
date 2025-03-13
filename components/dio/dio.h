@@ -56,7 +56,12 @@ typedef struct
     int on[6];
     int off[6];
 } di_automation_relay_config_t;
-/** END Struct DI relay automation */
+
+/** Struct OPENTHERM automation */
+typedef struct
+{
+    short int ch;
+} di_automation_opentherm_config_t;
 
 typedef struct
 {
@@ -66,6 +71,8 @@ typedef struct
 } di_automation_boiler_config_t;
 
 do_port_index_t do_map_channel(int channel);
+
+do_port_index_t di_map_channel(int channel);
 
 esp_err_t init_do();
 

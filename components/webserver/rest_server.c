@@ -421,6 +421,7 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
     {
         success = true;
         int index = do_map_channel(cJSON_GetObjectItem(state, "index")->valueint);
+        // int index = cJSON_GetObjectItem(state, "index")->valueint;
         int value = cJSON_GetObjectItem(state, "state")->valueint;
         do_set_level(index, value);
     }
@@ -626,7 +627,14 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
 
     if (strcmp(type, "sensors") == 0)
     {
-        success = um_config_write_config_file(CONFIG_FILE_SENSORS, data);
+        if (cJSON_HasObjectItem(data, "do") && cJSON_HasObjectItem(data, "di"))
+        {
+            success = um_config_write_config_file(CONFIG_FILE_SENSORS, data);
+        }
+        else
+        {
+            success = false;
+        }
     }
 
     if (strcmp(type, "api") == 0)

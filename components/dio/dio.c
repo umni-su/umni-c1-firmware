@@ -25,10 +25,9 @@ static led_blink_t led_blink_err_conf;
 static uint8_t current_state;
 
 /** DI Automation action configuration */
-di_automation_relay_config_t automation_relay_config[6] = {
-    {.ext = false,
-     .off = {-1, -1, -1, -1, -1, -1},
-     .on = {-1, -1, -1, -1, -1, -1}}};
+di_automation_relay_config_t automation_relay_config[6];
+
+di_automation_opentherm_config_t automation_opentherm_config[6];
 
 uint8_t do_get_nvs_state()
 {
@@ -57,6 +56,16 @@ esp_err_t do_restore_all_values()
 
 esp_err_t init_do()
 {
+    for (int i = 0; i < 6; i++)
+    {
+        automation_relay_config[i].ext = false;
+        for (int j = 0; j < 6; j++)
+        {
+            automation_relay_config[i].on[j] = -1;
+            automation_relay_config[i].off[j] = -1;
+        }
+        automation_opentherm_config[i].ch = -1;
+    }
     char *config_file = um_config_get_config_file_dio();
     cJSON *config = cJSON_Parse(config_file);
     if (cJSON_HasObjectItem(config, "di"))
@@ -66,7 +75,7 @@ esp_err_t init_do()
 
         cJSON_ArrayForEach(di_el, di_ar)
         {
-            short int port = cJSON_HasObjectItem(di_el, "index") ? cJSON_GetObjectItem(di_el, "index")->valueint : -1;
+            int port = cJSON_HasObjectItem(di_el, "index") ? cJSON_GetObjectItem(di_el, "index")->valueint : -1;
             if (port >= 0)
             {
                 bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
@@ -94,8 +103,10 @@ esp_err_t init_do()
                                 cJSON_ArrayForEach(val, on)
                                 {
                                     automation_relay_config[port].on[i] = val->valueint;
+                                    // ESP_LOGE("!!!!!!!!!!!", "automation_relay_config port:%d i:%d val:%d", port, i, val->valueint);
                                     i++;
                                 }
+                                // ESP_LOGE("!!!!!!!!!!!", "automation_relay_config.on[3]:%d", automation_relay_config[port].on[3]);
                             }
 
                             i = 0;
@@ -111,6 +122,11 @@ esp_err_t init_do()
                             }
 
                             automation_relay_config[port].ext = ext;
+                        }
+                        else if (type != NULL && type->valueint == 2) // тип автоматизации - котел
+                        {
+                            unsigned short int ch = cJSON_GetObjectItem(opt, "ch")->valueint; // включить или выключить котел
+                            automation_opentherm_config[port].ch = ch;
                         }
                     }
                 }
@@ -173,9 +189,35 @@ do_port_index_t do_map_channel(int channel)
     }
 }
 
+do_port_index_t di_map_channel(int channel)
+{
+    switch (channel)
+    {
+    case 0:
+        return DI_1;
+    case 1:
+        return DI_2;
+    case 2:
+        return DI_3;
+    case 3:
+        return DI_4;
+    case 4:
+        return DI_5;
+    case 5:
+        return DI_6;
+    case 6:
+        return DI_FN;
+    case 7:
+        return DI_CFG;
+
+    default:
+        return 0;
+    }
+}
+
 do_level_t do_get_level(do_port_index_t channel)
 {
-    channel = do_map_channel(channel);
+    // channel = do_map_channel(channel);
     esp_err_t res = pcf8574_port_read(&pcf8574_output_dev_t, &output_data);
     if (res == ESP_OK)
     {
@@ -191,7 +233,7 @@ do_level_t do_get_level(do_port_index_t channel)
 
 esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
 {
-    channel = do_map_channel(channel);
+    // channel = do_map_channel(channel);
     if (level == DO_LOW)
     {
         output_data = output_data | (1 << channel);
@@ -212,7 +254,7 @@ esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
         if (channel != CONFIG_UMNI_ERR_LED && channel != CONFIG_UMNI_STAT_LED)
         {
             esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DO, (void *)&message, sizeof(message), portMAX_DELAY);
-            ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
+            // ESP_LOGW("DO STATE", "%u", do_get_nvs_state());
         }
     }
     if (res != ESP_OK)
@@ -396,20 +438,22 @@ void di_interrupt_task(void *arg)
             input_data = current_state; // set last level to input pins
 
             um_ev_message_dio message = {
-                .index = i,
+                .index = di_map_channel(i),
                 .level = pin_level};
 
             // if (pin_level == 1)
             //{
-            ESP_LOGW("AUTO", "pin level high");
 
             if (automation_relay_config[i].ext)
             {
-                ESP_LOGW("AUTO", "automation_relay_config[i].ext TRUE");
                 for (int j = 0; j < 6; j++)
                 {
                     // передаем нормальное состояние для группы реле на "вкл"
                     int channel_on = automation_relay_config[i].on[j];
+                    // ESP_LOGI(
+                    //     "AUTO",
+                    //     "ch %d, ext: %d, on: %d, off: %d",
+                    //     i, automation_relay_config[i].ext, automation_relay_config[i].on[j], automation_relay_config[i].off[j]);
                     if (channel_on >= 0)
                     {
                         do_set_level(channel_on, pin_level);
@@ -420,6 +464,19 @@ void di_interrupt_task(void *arg)
                     {
                         do_set_level(channel_off, !pin_level);
                     }
+                }
+
+                short int ch = automation_opentherm_config[i].ch;
+                if (ch >= 0)
+                {
+                    int ot_ch = automation_opentherm_config[i].ch;
+                    if (pin_level == 0)
+                    {
+                        ot_ch = ot_ch == 1 ? 0 : 1;
+                    }
+
+                    esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
                 }
             }
 

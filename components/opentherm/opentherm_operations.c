@@ -32,6 +32,22 @@ bool is_busy = false;
 
 unsigned long status;
 
+void esp_ot_event_handler(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
+{
+    if (id != EV_OT_CH_ON && id != EV_OT_CH_OFF)
+    {
+        return;
+    }
+    enableCentralHeating = id == EV_OT_CH_ON ? true : false;
+
+    esp_err_t res = um_ot_set_boiler_status(
+        enableCentralHeating,
+        enableHotWater, enableCooling,
+        enableOutsideTemperatureCompensation,
+        enableCentralHeating2);
+    ESP_LOGI(TAG, "OT CH triggered by event. OT is %s", enableCentralHeating ? "ON" : "OFF");
+}
+
 void esp_ot_control_task_handler(void *pvParameter)
 {
     // Устанавливаем начальные целевые значения из NVS
@@ -221,6 +237,8 @@ void um_ot_set_dhw_setpoint(float temp)
 
 void um_ot_init()
 {
+    esp_event_handler_register(APP_EVENTS, ESP_EVENT_ANY_ID, &esp_ot_event_handler, NULL);
+
     esp_ot_init(
         OT_IN_PIN,
         OT_OUT_PIN,

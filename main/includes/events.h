@@ -48,7 +48,9 @@ extern "C"
         EV_OTA_START,
         EV_OTA_SUCCESS,
         EV_OTA_ABORT,
-        EV_OT_SET_DATA
+        EV_OT_SET_DATA,
+        EV_OT_CH_ON,
+        EV_OT_CH_OFF
     };
 
 #ifdef __cplusplus

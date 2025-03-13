@@ -147,27 +147,35 @@ void um_config_create_config_file_sensors()
         cJSON *outputs = cJSON_CreateArray();
 
         const int do_channels[] = {
-            CONFIG_UMNI_DI_CHAN_1,
-            CONFIG_UMNI_DI_CHAN_2,
-            CONFIG_UMNI_DI_CHAN_3,
-            CONFIG_UMNI_DI_CHAN_4,
-            CONFIG_UMNI_DI_CHAN_5,
-            CONFIG_UMNI_DI_CHAN_6};
+            DO_1,
+            DO_2,
+            DO_3,
+            DO_4,
+            DO_5,
+            DO_6};
+
+        const int di_channels[] = {
+            DI_1,
+            DI_2,
+            DI_3,
+            DI_4,
+            DI_5,
+            DI_6};
 
         for (int i = 0; i < 6; i++)
         {
             char label_do[10];
             char label_di[10];
-            sprintf(label_do, "Relay %d", do_channels[i]);
+            sprintf(label_do, "Relay %d", (i + 1));
             cJSON *state_do = cJSON_CreateObject();
             cJSON_AddStringToObject(state_do, "label", label_do);
-            cJSON_AddNumberToObject(state_do, "index", i);
+            cJSON_AddNumberToObject(state_do, "index", do_channels[i]);
             cJSON_AddItemToArray(outputs, state_do);
 
-            sprintf(label_di, "Input %d", do_channels[i]);
+            sprintf(label_di, "Input %d", (i + 1));
             cJSON *state_di = cJSON_CreateObject();
             cJSON_AddStringToObject(state_di, "label", label_di);
-            cJSON_AddNumberToObject(state_di, "index", i);
+            cJSON_AddNumberToObject(state_di, "index", di_channels[i]);
             cJSON_AddItemToArray(inputs, state_di);
         }
 
@@ -249,7 +257,7 @@ char *um_config_get_config_file_dio()
     cJSON_ArrayForEach(el, di_array)
     {
         level = 0;
-        level = ((inputs >> i) & 0x01) == 0 ? 0 : 1;
+        level = ((inputs >> di_map_channel(i)) & 0x01) == 0 ? 0 : 1;
         cJSON_AddNumberToObject(el, "state", level);
         i++;
     }
