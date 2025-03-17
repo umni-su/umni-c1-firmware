@@ -4,10 +4,9 @@
 #include "mosquitto.h"
 
 #include "../config/config.h"
-
 #include "../../main/includes/events.h"
-
 #include "../nvs/nvs.h"
+#include "../systeminfo/systeminfo.h"
 
 const char *MQTT_TAG = "mqtt";
 
@@ -26,7 +25,28 @@ esp_mqtt_client_handle_t client = NULL;
 
 static um_mqtt_status_t connection_status;
 
+TaskHandle_t mqtt_register_handler = NULL;
+
 bool success = false;
+
+void um_mqtt_register_task(void *args)
+{
+    while (true)
+    {
+        if (!connected)
+        {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+        else
+        {
+            um_mqtt_register_device();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            um_mqtt_send_config();
+            vTaskDelay(REGISTER_TIMEOUT / portTICK_PERIOD_MS);
+        }
+    }
+    vTaskDelete(mqtt_register_handler);
+}
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -57,11 +77,21 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
         cJSON_AddNumberToObject(payload, "channel", status_ntc->channel);
         cJSON_AddNumberToObject(payload, "temp", status_ntc->temp);
         break;
+
+    case EV_STATUS_CHANGED_OW:
+        topic = UM_TOPIC_STATUS_ONEWIRE;
+        um_ev_message_onewire *status_onewire = (um_ev_message_onewire *)event_data;
+
+        cJSON_AddStringToObject(payload, "sn", status_onewire->sn);
+        cJSON_AddNumberToObject(payload, "temp", status_onewire->temp);
+        break;
     }
+
     char *json = cJSON_PrintUnformatted(payload);
     um_mqtt_publish_data(topic, json);
     free((void *)json);
     cJSON_Delete(payload);
+    ESP_LOGW("HEAP", "[watch_events (mqtt)] Free memory: %ld bytes", esp_get_free_heap_size());
 }
 
 /*
@@ -86,9 +116,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         connected = true;
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
 
-        um_mqtt_register_device();
-
-        um_mqtt_send_config();
+        xTaskCreatePinnedToCore(um_mqtt_register_task, "mqtt_register_task", configMINIMAL_STACK_SIZE * 2, NULL, 3, &mqtt_register_handler, 1);
 
         // SUBSCRIBE HERE!
 
@@ -198,10 +226,10 @@ esp_err_t um_mqtt_publish_data(char *topic, char *data)
 {
     if (topic == NULL)
         return ESP_FAIL;
-    size_t prefix_len = strcmp(topic, UM_TOPIC_REGISTER) == 0 ? 0 : strlen(UM_TOPIC_PREFIX_STATUS);
+    size_t prefix_len = strcmp(topic, UM_TOPIC_REGISTER) == 0 ? 0 : strlen(UM_TOPIC_PREFIX_DEVICE);
     size_t len = strlen(topic) + strlen(name) + prefix_len + 1;
     char real_topic[len];
-    sprintf(real_topic, "%s%s%s", prefix_len == 0 ? "" : UM_TOPIC_PREFIX_STATUS, name, topic);
+    sprintf(real_topic, "%s%s%s", UM_TOPIC_PREFIX_DEVICE, strcmp(topic, UM_TOPIC_REGISTER) == 0 ? "" : name, topic);
     esp_err_t res = ESP_OK;
     if (!connected)
     {
@@ -210,7 +238,7 @@ esp_err_t um_mqtt_publish_data(char *topic, char *data)
     if (client != NULL)
     {
 
-        ESP_LOGW("MQTT", "\r\nSend data to server: %s, %s\r\n", real_topic, data);
+        ESP_LOGI("MQTT", "Send data to server: %s, %s", real_topic, data);
         msg_id = esp_mqtt_client_publish(client, real_topic, data, 0, 0, 0);
     }
     res = ESP_OK;
@@ -219,12 +247,45 @@ esp_err_t um_mqtt_publish_data(char *topic, char *data)
 
 esp_err_t um_mqtt_register_device()
 {
-    // @todo Add umni key to activate in request later?
-    um_mqtt_device_register_request_t request_params = {
-        .name = name};
 
     cJSON *request = cJSON_CreateObject();
-    cJSON_AddStringToObject(request, "name", request_params.name);
+
+    cJSON_AddStringToObject(request, "name", name);
+    cJSON_AddNumberToObject(request, "type", DEVICE_UMNI_C_ONE);
+
+    cJSON *systeminfo = cJSON_CreateObject();
+
+    um_netif_data_type_t eth = um_systeminfo_get_eth_netif_config();
+
+    // const um_systeminfo_data_type_t system_info = um_systeminfo_get_struct_data();
+
+    // cJSON *systeminfo = cJSON_CreateObject();
+
+    // cJSON_AddStringToObject(systeminfo, "date", system_info.date);
+    // cJSON_AddStringToObject(systeminfo, "last_reset", system_info.last_reset);
+    // cJSON_AddNumberToObject(systeminfo, "reset_reason", (int)system_info.restart_reason);
+    // cJSON_AddNumberToObject(systeminfo, "uptime", system_info.uptime);
+    // cJSON_AddNumberToObject(systeminfo, "free_heap", system_info.free_heap);
+    // cJSON_AddNumberToObject(systeminfo, "total_heap", system_info.total_heap);
+    // cJSON_AddStringToObject(systeminfo, "fw_ver", system_info.fw_ver);
+    // cJSON_AddStringToObject(systeminfo, "fw_ver_web", system_info.fw_ver_web);
+    // cJSON_AddNumberToObject(systeminfo, "chip", system_info.chip);
+    // cJSON_AddNumberToObject(systeminfo, "cores", system_info.cores);
+    // cJSON_AddNumberToObject(systeminfo, "revision", system_info.model);
+
+    // // Netif
+    cJSON *netif = cJSON_CreateArray();
+    // // ETHERNET
+    cJSON *ethernet = cJSON_CreateObject();
+    cJSON_AddStringToObject(ethernet, "name", eth.name);
+    cJSON_AddStringToObject(ethernet, "mac", eth.mac);
+    cJSON_AddStringToObject(ethernet, "ip", eth.ip);
+    cJSON_AddStringToObject(ethernet, "mask", eth.mask);
+    cJSON_AddStringToObject(ethernet, "gw", eth.gw);
+
+    cJSON_AddItemToArray(netif, ethernet);
+    cJSON_AddItemToObject(systeminfo, "netif", netif);
+    cJSON_AddItemToObject(request, "systeminfo", systeminfo);
 
     char *data = cJSON_PrintUnformatted(request);
 
@@ -238,19 +299,28 @@ esp_err_t um_mqtt_register_device()
 
 esp_err_t um_mqtt_send_config()
 {
-    const char *config = um_config_get_config_file_dio();
-    cJSON *json_config = cJSON_Parse(config);
-    char *json_str = cJSON_PrintUnformatted(json_config);
-    um_mqtt_publish_data(UM_TOPIC_STATUS_DIO, json_str);
+    char *config;
+    cJSON *json_config;
+    char *json_str;
+    config = um_config_get_config_file_dio();
+    json_config = cJSON_Parse(config);
+    json_str = cJSON_PrintUnformatted(json_config);
+    um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_DIO, json_str);
+
+    free(json_str);
+    cJSON_Delete(json_config);
+    free(config);
 
     config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
     json_config = cJSON_Parse(config);
     json_str = cJSON_PrintUnformatted(json_config);
-    um_mqtt_publish_data(UM_TOPIC_STATUS_ONEWIRE, json_str);
+    um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_OW, json_str);
 
-    free((void *)config);
-    free((void *)json_str);
+    free(json_str);
     cJSON_Delete(json_config);
+    free(config);
+
+    ESP_LOGW("HEAP", "[um_mqtt_send_config] Free memory: %ld bytes", esp_get_free_heap_size());
 
     return ESP_OK;
 }

@@ -20,6 +20,12 @@ extern "C"
         float temp;
     } um_ev_message_ntc;
 
+    typedef struct
+    {
+        char *sn;
+        float temp;
+    } um_ev_message_onewire;
+
     // Declare an event base
     ESP_EVENT_DECLARE_BASE(APP_EVENTS); // declaration of the timer events family
 
@@ -45,6 +51,7 @@ extern "C"
         EV_STATUS_CHANGED_DI,
         EV_STATUS_CHANGED_DO,
         EV_STATUS_CHANGED_NTC,
+        EV_STATUS_CHANGED_OW,
         EV_OTA_START,
         EV_OTA_SUCCESS,
         EV_OTA_ABORT,

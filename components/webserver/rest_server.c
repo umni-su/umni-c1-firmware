@@ -219,7 +219,7 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     cJSON_AddStringToObject(root, "date", info.date);
     cJSON_AddStringToObject(root, "last_reset", info.last_reset);
     cJSON_AddNumberToObject(root, "reset_reason", (int)info.restart_reason);
-    cJSON_AddNumberToObject(root, "uptime", (int)info.uptime);
+    cJSON_AddNumberToObject(root, "uptime", info.uptime);
     cJSON_AddNumberToObject(root, "free_heap", info.free_heap);
     cJSON_AddNumberToObject(root, "total_heap", info.total_heap);
     cJSON_AddStringToObject(root, "fw_ver", info.fw_ver);
@@ -420,7 +420,7 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
     if (strcmp(type, "dio") == 0)
     {
         success = true;
-        int index = do_map_channel(cJSON_GetObjectItem(state, "index")->valueint);
+        int index = cJSON_GetObjectItem(state, "index")->valueint;
         // int index = cJSON_GetObjectItem(state, "index")->valueint;
         int value = cJSON_GetObjectItem(state, "state")->valueint;
         do_set_level(index, value);

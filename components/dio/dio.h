@@ -40,6 +40,12 @@ typedef enum
     DO_LOW = 0
 } do_level_t;
 
+typedef enum
+{
+    DI_HIGH = 1,
+    DI_LOW = 0
+} di_level_t;
+
 typedef struct
 {
     di_port_index_t chan;
@@ -73,6 +79,10 @@ typedef struct
 do_port_index_t do_map_channel(int channel);
 
 do_port_index_t di_map_channel(int channel);
+
+di_level_t di_get_level(di_port_index_t index);
+
+bool di_is_config_mode();
 
 esp_err_t init_do();
 

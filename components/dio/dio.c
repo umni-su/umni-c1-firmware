@@ -420,9 +420,30 @@ esp_err_t init_di()
         pcf8574_port_write(&pcf8574_input_dev_t, (uint8_t)input_data);
         vTaskDelay(20 / portTICK_PERIOD_MS);
         pcf8574_port_read(&pcf8574_input_dev_t, &input_data);
+
+        if (di_is_config_mode())
+        {
+            ESP_LOGI("dio", "UMNI in config mode");
+        }
+        else
+        {
+            ESP_LOGI("dio", "UMNI in normal mode. Turn off log level programaticaly");
+            esp_log_level_set(NULL, ESP_LOG_NONE);
+        }
     }
 
     return res;
+}
+
+di_level_t di_get_level(di_port_index_t index)
+{
+    return input_data >> index & 0x01;
+}
+
+bool di_is_config_mode()
+{
+    di_level_t level = di_get_level(DI_CFG);
+    return level == DI_LOW;
 }
 
 void di_interrupt_task(void *arg)
@@ -432,57 +453,79 @@ void di_interrupt_task(void *arg)
     {
         int pin_level = current_state >> i & 0x01;
         int current_pin_level = input_data >> i & 0x01;
-        if (pin_level != current_pin_level)
+        if (i != DI_FN && i != DI_CFG)
         {
-            ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
-            input_data = current_state; // set last level to input pins
-
-            um_ev_message_dio message = {
-                .index = di_map_channel(i),
-                .level = pin_level};
-
-            // if (pin_level == 1)
-            //{
-
-            if (automation_relay_config[i].ext)
+            if (pin_level != current_pin_level)
             {
-                for (int j = 0; j < 6; j++)
+                ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
+                input_data = current_state; // set last level to input pins
+
+                um_ev_message_dio message = {
+                    .index = i,
+                    .level = pin_level};
+
+                // if (pin_level == 1)
+                //{
+
+                if (automation_relay_config[i].ext)
                 {
-                    // передаем нормальное состояние для группы реле на "вкл"
-                    int channel_on = automation_relay_config[i].on[j];
-                    // ESP_LOGI(
-                    //     "AUTO",
-                    //     "ch %d, ext: %d, on: %d, off: %d",
-                    //     i, automation_relay_config[i].ext, automation_relay_config[i].on[j], automation_relay_config[i].off[j]);
-                    if (channel_on >= 0)
+                    for (int j = 0; j < 6; j++)
                     {
-                        do_set_level(channel_on, pin_level);
+                        // передаем нормальное состояние для группы реле на "вкл"
+                        int channel_on = automation_relay_config[i].on[j];
+                        // ESP_LOGI(
+                        //     "AUTO",
+                        //     "ch %d, ext: %d, on: %d, off: %d",
+                        //     i, automation_relay_config[i].ext, automation_relay_config[i].on[j], automation_relay_config[i].off[j]);
+                        if (channel_on >= 0)
+                        {
+                            do_set_level(channel_on, pin_level);
+                        }
+                        // передаем инверсное состояние для группы реле на "выкл"
+                        int channel_off = automation_relay_config[i].off[j];
+                        if (channel_off >= 0)
+                        {
+                            do_set_level(channel_off, !pin_level);
+                        }
                     }
-                    // передаем инверсное состояние для группы реле на "выкл"
-                    int channel_off = automation_relay_config[i].off[j];
-                    if (channel_off >= 0)
+
+                    short int ch = automation_opentherm_config[i].ch;
+                    if (ch >= 0)
                     {
-                        do_set_level(channel_off, !pin_level);
+                        int ot_ch = automation_opentherm_config[i].ch;
+                        if (pin_level == 0)
+                        {
+                            ot_ch = ot_ch == 1 ? 0 : 1;
+                        }
+
+                        esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
+                        vTaskDelay(100 / portTICK_PERIOD_MS);
                     }
                 }
 
-                short int ch = automation_opentherm_config[i].ch;
-                if (ch >= 0)
-                {
-                    int ot_ch = automation_opentherm_config[i].ch;
-                    if (pin_level == 0)
-                    {
-                        ot_ch = ot_ch == 1 ? 0 : 1;
-                    }
+                //}
 
-                    esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
-                    vTaskDelay(100 / portTICK_PERIOD_MS);
+                esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DI, &message, sizeof(message), portMAX_DELAY);
+            }
+        }
+        else
+        {
+            if (pin_level != current_pin_level)
+            {
+                input_data = current_state;
+                if (i == DI_FN)
+                {
+                    ESP_LOGI("DI_FN", "Function button is pressed! Level is: %d, prev level: %d", pin_level, current_pin_level);
+                }
+                if (i == DI_CFG)
+                {
+                    ESP_LOGI("DI_CFG", "Config switch pressed! Level is: %d, prev level: %d", pin_level, current_pin_level);
+                }
+                else
+                {
+                    ESP_LOGI("DI_?????", "Pressed! Level is: %d, prev level: %d", pin_level, current_pin_level);
                 }
             }
-
-            //}
-
-            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DI, &message, sizeof(message), portMAX_DELAY);
         }
     }
     vTaskDelete(NULL);

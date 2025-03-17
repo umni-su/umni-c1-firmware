@@ -16,7 +16,7 @@ TaskHandle_t onewire_task_handle = NULL;
 
 void onewire_task(void *arg)
 {
-    char string_address[16] = {0};
+    char string_address[18] = {0};
     while (true)
     {
         for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++)
@@ -40,6 +40,10 @@ void onewire_task(void *arg)
                     if (res == ESP_OK)
                     {
                         ESP_LOGI(ONE_WIRE_TASK_TAG, "[%s]: temp is: %.2f°C, family_id: %d", string_address, temp, family_id);
+                        um_ev_message_onewire message = {
+                            .sn = string_address,
+                            .temp = temp};
+                        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
                         //  free(buff);
                     }
                     break;
@@ -49,7 +53,6 @@ void onewire_task(void *arg)
                 }
             }
         }
-        ESP_LOGW(ONE_WIRE_TAG, "[onewire_task] Free memory: %ld bytes", esp_get_free_heap_size());
         vTaskDelay(ONEWIRE_TASK_TIMEOUT / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);

@@ -11,9 +11,10 @@ typedef struct
 
 typedef struct
 {
+    char *name;
     char *date;
     char *last_reset;
-    int uptime; // microseconds
+    uint64_t uptime; // microseconds
     esp_reset_reason_t restart_reason;
     uint32_t free_heap;
     size_t total_heap;
@@ -37,5 +38,7 @@ void um_systeminfo_update_date();
 char *um_systeminfo_get_date();
 
 void um_systeminfo_init_sntp();
+
+um_netif_data_type_t um_systeminfo_get_eth_netif_config();
 
 um_systeminfo_data_type_t um_systeminfo_get_struct_data();

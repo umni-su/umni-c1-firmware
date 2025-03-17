@@ -20,6 +20,7 @@
 const char *TAG = "systeminfo";
 const char *ntp_host;
 static char *reset_at = NULL;
+static char *name;
 
 time_t now;
 char strftime_buf[64];
@@ -31,8 +32,7 @@ um_netif_data_type_t eth_ip_info;
 
 static um_systeminfo_data_type_t data;
 
-static void
-shutdown_handler()
+static void shutdown_handler()
 {
     um_nvs_write_str(NVS_KEY_RESET_AT, um_systeminfo_get_date());
 }
@@ -130,6 +130,7 @@ void um_systeminfo_init()
 {
     um_nvs_write_str(NVS_KEY_POWERON_AT, strftime_buf);
     esp_register_shutdown_handler(shutdown_handler);
+    name = um_nvs_read_str(NVS_KEY_MACNAME);
     um_systeminfo_init_sntp();
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 }
@@ -141,6 +142,7 @@ um_systeminfo_data_type_t um_systeminfo_get_struct_data()
     reset_at = um_nvs_read_str(NVS_KEY_RESET_AT);
     esp_chip_info_t info;
     esp_chip_info(&info);
+    data.name = name;
     data.date = strftime_buf;
     data.last_reset = reset_at;
     data.uptime = esp_timer_get_time();
@@ -159,4 +161,9 @@ um_systeminfo_data_type_t um_systeminfo_get_struct_data()
     data.ip_eth_info.gw = eth_ip_info.gw;
     data.ip_eth_info.mac = eth_ip_info.mac;
     return data;
+}
+
+um_netif_data_type_t um_systeminfo_get_eth_netif_config()
+{
+    return eth_ip_info;
 }

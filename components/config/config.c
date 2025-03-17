@@ -164,18 +164,22 @@ void um_config_create_config_file_sensors()
 
         for (int i = 0; i < 6; i++)
         {
-            char label_do[10];
-            char label_di[10];
+            unsigned short int do_index = do_channels[i];
+            unsigned short int di_index = di_channels[i];
+            char label_do[16];
+            char label_di[16];
             sprintf(label_do, "Relay %d", (i + 1));
             cJSON *state_do = cJSON_CreateObject();
             cJSON_AddStringToObject(state_do, "label", label_do);
-            cJSON_AddNumberToObject(state_do, "index", do_channels[i]);
+            cJSON_AddNumberToObject(state_do, "index", do_index);
+            cJSON_AddNumberToObject(state_do, "order", i);
             cJSON_AddItemToArray(outputs, state_do);
 
             sprintf(label_di, "Input %d", (i + 1));
             cJSON *state_di = cJSON_CreateObject();
             cJSON_AddStringToObject(state_di, "label", label_di);
-            cJSON_AddNumberToObject(state_di, "index", di_channels[i]);
+            cJSON_AddNumberToObject(state_di, "index", di_index);
+            cJSON_AddNumberToObject(state_di, "order", i);
             cJSON_AddItemToArray(inputs, state_di);
         }
 
@@ -248,7 +252,7 @@ char *um_config_get_config_file_dio()
     // TODO change i with CONFIG_UMNI_DI_
     cJSON_ArrayForEach(el, do_array)
     {
-        level = ((relays >> i) & 0x01) == 0 ? 1 : 0;
+        level = ((relays >> do_map_channel(i)) & 0x01) == 0 ? 1 : 0;
         cJSON_AddNumberToObject(el, "state", level);
         i++;
     }
