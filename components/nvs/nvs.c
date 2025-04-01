@@ -78,7 +78,7 @@ esp_err_t um_nvs_initialize_with_basic()
     res = um_nvs_write_str(NVS_KEY_HOSTNAME, CONFIG_UMNI_NVS_HOSTNAME); // Hostname
     res = um_nvs_write_str(NVS_KEY_NTP, CONFIG_UMNI_NVS_NTP_DEFAULT);   // NTP server
 
-    res = um_nvs_write_i8(NVS_KEY_OT_ENABLED, 1); // Enable OPENTERM as default
+    res = um_nvs_write_i8(NVS_KEY_OT_CH, 1); // Enable OPENTERM as default
     res = um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, 55);
     res = um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, 45);
 

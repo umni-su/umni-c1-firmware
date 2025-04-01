@@ -41,9 +41,14 @@
 /**
  * Opentherm values
  */
-#define NVS_KEY_OT_ENABLED "oten"
-#define NVS_KEY_OT_DHW_SETPOINT "otdhwsp"
-#define NVS_KEY_OT_TB_SETPOINT "ottbsp"
+#define NVS_KEY_OT_CH "oten"              // отопление активно или нет
+#define NVS_KEY_OT_CH2 "oten2"            // отопление второго контура активно или нет
+#define NVS_KEY_OT_DHW_SETPOINT "otdhwsp" // гвс т-ра
+#define NVS_KEY_OT_DHW_EN "otdhwen"       // гвс активен или нет
+#define NVS_KEY_OT_TB_SETPOINT "ottbsp"   // отопление
+#define NVS_KEY_OT_COOL "otcol"           // охлаждение
+#define NVS_KEY_OT_MOD "otmod"            // установленный режим модуляции
+#define NVS_KEY_OT_OTC "ototc"            // наружний датчик температуры
 
 /**
  * Relays

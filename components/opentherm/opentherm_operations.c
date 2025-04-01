@@ -12,7 +12,7 @@
 
 static int targetDHWTemp = 59;
 static int targetCHTemp = 60;
-static bool fault = false;
+static bool needReset = false;
 
 bool enableCentralHeating = true;
 bool enableHotWater = true;
@@ -30,7 +30,14 @@ open_therm_response_status_t ot_response_status;
 
 bool is_busy = false;
 
+bool initialized = false;
+
 unsigned long status;
+
+static unsigned char task_count = 0;
+static unsigned char task_count_max_to_send_data = 2;
+
+static bool need_read_pump = false;
 
 void esp_ot_event_handler(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -53,7 +60,9 @@ void esp_ot_control_task_handler(void *pvParameter)
     // Устанавливаем начальные целевые значения из NVS
     targetDHWTemp = um_nvs_read_i8(NVS_KEY_OT_DHW_SETPOINT);
     targetCHTemp = um_nvs_read_i8(NVS_KEY_OT_TB_SETPOINT);
-    enableCentralHeating = um_nvs_read_i8(NVS_KEY_OT_ENABLED) == 1;
+    enableCentralHeating = um_nvs_read_i8(NVS_KEY_OT_CH) == 1;
+    enableHotWater = um_nvs_read_i8(NVS_KEY_OT_DHW_EN) == 1;
+    enableOutsideTemperatureCompensation = um_nvs_read_i8(NVS_KEY_OT_OTC) == 1;
 
     while (true)
     {
@@ -65,8 +74,11 @@ void esp_ot_control_task_handler(void *pvParameter)
         um_ot_set_boiler_temp(targetCHTemp);
         um_ot_set_dhw_setpoint(targetDHWTemp);
 
+        ESP_LOGI(TAG, "Set CH: %i,  DHW %i", targetCHTemp, targetDHWTemp);
+
         if (res != ESP_OK)
         {
+            ot_data.adapter_success = false;
             ESP_LOGE(TAG, "Opentherm um_ot_set_boiler_status return ESP_FAIL, retry...");
             res = um_ot_set_boiler_status(
                 enableCentralHeating,
@@ -74,77 +86,157 @@ void esp_ot_control_task_handler(void *pvParameter)
                 enableOutsideTemperatureCompensation,
                 enableCentralHeating2);
             um_ot_set_boiler_temp(targetCHTemp);
-            um_ot_set_boiler_temp(targetDHWTemp);
+            um_ot_set_dhw_setpoint(targetDHWTemp);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             continue;
         }
+
         if (!is_busy)
         {
+
             is_busy = true;
 
             ESP_LOGI(TAG, "\r\n====== OPENTHERM DATA =====");
             ESP_LOGI(TAG, "Free heap size before: %ld", esp_get_free_heap_size());
-            ESP_LOGI(TAG, "NVS OT values - ch: %d, dhwsp: %d tbsp: %d", enableCentralHeating, targetDHWTemp, targetCHTemp);
+            ESP_LOGI(TAG, "NVS OT values - chen: %d, hwa: %d, dhwspt: %d chspt: %d", enableCentralHeating, enableHotWater, targetDHWTemp, targetCHTemp);
 
             ot_response_status = esp_ot_get_last_response_status();
 
             if (ot_response_status == OT_STATUS_SUCCESS)
             {
+                esp_ot_slave_config_t slave = esp_ot_get_slave_configuration();
+                ot_data.slave_config = slave;
+
+                if (!initialized)
+                {
+
+                    ot_data.mod = um_nvs_read_i8(NVS_KEY_OT_MOD);
+                    // установка начального значения модуляции горелки, если в NVS нет значения, или оно < 0
+                    if (ot_data.mod < 0)
+                    {
+                        ot_data.mod = 100;
+                        um_nvs_write_i8(NVS_KEY_OT_MOD, ot_data.mod);
+                    }
+
+                    const float slave_ot_version = esp_ot_get_slave_ot_version();
+                    const unsigned long slave_product_version = esp_ot_get_slave_product_version();
+                    ESP_LOGI(TAG, "Slave OT Version: %.1f", slave_ot_version);
+                    ESP_LOGI(TAG, "Slave Version: %08lX", slave_product_version);
+
+                    ot_data.slave_ot_version = slave_ot_version;
+                    ot_data.slave_product_version = slave_product_version;
+                    initialized = true;
+                }
+
+                esp_ot_set_modulation_level(ot_data.mod);
+
                 const float modulation = esp_ot_get_modulation();
                 const float pressure = esp_ot_get_pressure();
-                const float slave_ot_version = esp_ot_get_slave_ot_version();
-                const unsigned long slave_product_version = esp_ot_get_slave_product_version();
                 const float dhwTemp = esp_ot_get_dhw_temperature();
                 const float chTemp = esp_ot_get_boiler_temperature();
                 const float retTemp = esp_ot_get_return_temperature();
 
                 ot_data.status = ot_response_status;
                 ot_data.otch = enableCentralHeating;
-
+                ot_data.ototc = enableOutsideTemperatureCompensation;
                 ot_data.pressure = pressure;
                 ot_data.modulation = modulation;
-                ot_data.slave_ot_version = slave_ot_version;
-                ot_data.slave_product_version = slave_product_version;
                 ot_data.dhw_temperature = dhwTemp;
                 ot_data.boiler_temperature = chTemp;
                 ot_data.return_temperature = retTemp;
-                ot_data.is_fault = fault;
                 ot_data.otdhwsp = targetDHWTemp;
                 ot_data.ottbsp = targetCHTemp;
-
-                if (fault)
-                {
-                    ot_reset();
-                }
+                ot_data.dhw_setpoint = esp_ot_get_dhw_setpoint();
+                ot_data.flow_rate = esp_ot_get_ch2_flow();
 
                 ESP_LOGI(TAG, "Central Heating: %s", ot_data.central_heating_active ? "ON" : "OFF");
+                ESP_LOGI(TAG, "DHW setpoint: %.1f", ot_data.dhw_setpoint);
                 ESP_LOGI(TAG, "Hot Water: %s", ot_data.hot_water_active ? "ON" : "OFF");
                 ESP_LOGI(TAG, "Flame: %s", ot_data.flame_on ? "ON" : "OFF");
-                ESP_LOGI(TAG, "Fault: %s", fault ? "YES" : "NO");
+                ESP_LOGI(TAG, "Fault: %s", ot_data.is_fault ? "YES" : "NO");
+                ESP_LOGI(TAG, "OTC: %s", ot_data.ototc ? "ON" : "OFF");
+                if (ot_data.is_fault)
+                {
+
+                    esp_ot_asf_flags_t flags = esp_ot_get_asf_flags();
+                    ot_data.asf_flags = flags;
+                    ESP_LOGE(TAG, "FAULT CODE: %d, DIAG CODE: %d", flags.fault_code, flags.diag_code);
+                    ESP_LOGE(TAG, "Is service: %d", flags.is_service_request);
+                    ESP_LOGE(TAG, "Can reset: %d", flags.can_reset);
+                    ESP_LOGE(TAG, "Is pressure error: %d", flags.is_air_press_fault);
+                    ESP_LOGE(TAG, "Is gas error: %d", flags.is_gas_flame_fault);
+                    ESP_LOGE(TAG, "Is low water pres: %d", flags.is_low_water_press);
+                    ESP_LOGE(TAG, "Is water over temp: %d", flags.is_water_over_temp);
+
+                    if (needReset)
+                    {
+                        ot_reset();
+                        needReset = false;
+                        ESP_LOGE(TAG, "Try to reset error code...");
+                    }
+                }
                 ESP_LOGI(TAG, "Tret: %.1f", dhwTemp);
                 ESP_LOGI(TAG, "CH Temp: %.1f", chTemp);
                 ESP_LOGI(TAG, "Pressure: %.1f", pressure);
                 ESP_LOGI(TAG, "Modulation:%.1f", modulation);
-                ESP_LOGI(TAG, "Slave OT Version: %.1f", slave_ot_version);
-                ESP_LOGI(TAG, "Slave Version: %08lX", slave_product_version);
+
+                ot_data.flow_rate = esp_ot_get_flow_rate();
+                ESP_LOGI(TAG, "esp_ot_get_flow_rate: %.1f", ot_data.flow_rate);
+
+                ot_data.ch_max_setpoint = esp_ot_get_ch_max_setpoint();
+                ESP_LOGI(TAG, "esp_ot_get_ch_max_setpoint: %.1f", ot_data.ch_max_setpoint);
+
+                ot_data.outside_temperature = esp_ot_get_outside_temperature();
+                ESP_LOGI(TAG, "esp_ot_get_outside_temperature: %.1f", ot_data.outside_temperature);
+
+                esp_ot_min_max_t dhw_bounds = esp_ot_get_dhw_upper_lower_bounds();
+                ot_data.dhw_min_max = dhw_bounds;
+                ESP_LOGI(TAG, "dhw_bounds min: %d, max: %d", dhw_bounds.min, dhw_bounds.max);
+
+                esp_ot_min_max_t ch_bounds = esp_ot_get_ch_upper_lower_bounds();
+                ot_data.ch_min_max = ch_bounds;
+                ESP_LOGI(TAG, "ch_bounds min: %d, max: %d", ot_data.ch_min_max.min, ot_data.ch_min_max.max);
+
+                esp_ot_cap_mod_t cap_mod = esp_ot_get_max_capacity_min_modulation();
+                ot_data.cap_mod = cap_mod;
+                ESP_LOGI(TAG, "ch_bounds cap: %d kw, min_mod: %d", ot_data.cap_mod.kw, ot_data.cap_mod.min_modulation);
+
+                if (ot_data.slave_config.pump_control_allowed && need_read_pump)
+                {
+                    uint16_t val = esp_ot_read_dhw_pump_starts();
+                    ESP_LOGI(TAG, "dhw_pump_starts : %d", val);
+
+                    val = esp_ot_read_dhw_pump_hours();
+                    ESP_LOGI(TAG, "dhw_pump_hours : %d", val);
+
+                    val = esp_ot_read_ch_pump_starts();
+                    ESP_LOGI(TAG, "ch_pump_starts : %d", val);
+
+                    val = esp_ot_read_ch_pump_hours();
+                    ESP_LOGI(TAG, "ch_pump_hours : %d", val);
+                }
+
+                ot_data.adapter_success = true;
             }
             else
             {
-                ESP_LOGW(TAG, "Error readingg %d", ot_response_status);
-            }
-
-            if (fault)
-            {
-                char code = esp_ot_get_fault();
-                ot_data.fault_code = code;
-                ESP_LOGE(TAG, "Fault Code: %i", code);
+                ESP_LOGW(TAG, "Error reading %d", ot_response_status);
             }
             ESP_LOGI(TAG, "Free heap size after: %ld", esp_get_free_heap_size());
             ESP_LOGI(TAG, "====== OPENTHERM =====\r\n\r\n");
             is_busy = false;
         }
-
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        if (task_count >= task_count_max_to_send_data)
+        {
+            // send mqtt
+            task_count = 0;
+            esp_event_post(APP_EVENTS, EV_OT_SET_DATA, NULL, sizeof(NULL), portMAX_DELAY);
+        }
+        else
+        {
+            task_count++;
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
     vTaskDelete(NULL);
 }
@@ -164,9 +256,8 @@ esp_err_t um_ot_set_boiler_status(
     enableOutsideTemperatureCompensation = enable_outside_temperature_compensation;
     enableCentralHeating2 = enable_central_heating2;
 
-    um_nvs_write_i8(NVS_KEY_OT_ENABLED, (int)enableCentralHeating);
-    ot_data.otch = (int)enableCentralHeating;
-
+    ot_data.otch = enableCentralHeating;
+    ESP_LOGW(TAG, "enableCentralHeating: %d  chtemp: %d dhwtemp:%d", enableCentralHeating, targetCHTemp, targetDHWTemp);
     esp_err_t res = ESP_OK;
     status = esp_ot_set_boiler_status(
         enableCentralHeating,
@@ -208,6 +299,36 @@ esp_err_t um_ot_set_boiler_status(
     return res;
 }
 
+// двухконтурный котел
+void um_ot_set_ch2(bool active)
+{
+    if (!ot_data.slave_config.ch2_present)
+    {
+        enableCentralHeating2 = active;
+        um_nvs_write_i8(NVS_KEY_OT_CH2, active ? 1 : 0);
+    }
+}
+
+// установка компенсации по температурному датчику (наружней т-ры)
+void um_ot_set_outside_temp_comp(bool state)
+{
+    um_nvs_write_i8(NVS_KEY_OT_OTC, state ? 1 : 0);
+    enableOutsideTemperatureCompensation = state;
+}
+
+void um_ot_set_modulation_level(char level)
+{
+    um_nvs_write_i8(NVS_KEY_OT_MOD, level);
+    ot_data.mod = level;
+}
+// активация горячего водостнабжения
+void um_ot_set_hot_water_active(bool hwa)
+{
+    um_nvs_write_i8(NVS_KEY_OT_DHW_EN, hwa ? 1 : 0);
+    ot_data.hwa = hwa;
+    enableHotWater = hwa;
+}
+
 // Установка целевой температуры бойлера
 void um_ot_set_boiler_temp(float temp)
 {
@@ -246,21 +367,10 @@ void um_ot_init()
         NULL);
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
-    // Get or ser DHW sp;
+    // Get or set DHW sp;
     targetDHWTemp = um_nvs_read_i8(NVS_KEY_OT_DHW_SETPOINT);
-    if (targetDHWTemp < 0)
-    {
-        targetDHWTemp = 45;
-        um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, targetDHWTemp);
-    }
-
-    // Get or ser TB sp;
+    // Get or set TB sp;
     targetCHTemp = um_nvs_read_i8(NVS_KEY_OT_TB_SETPOINT);
-    if (targetCHTemp < 0)
-    {
-        targetCHTemp = 60;
-        um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, targetCHTemp);
-    }
 
     ot_data.otdhwsp = targetDHWTemp;
     ot_data.ottbsp = targetCHTemp;
@@ -274,45 +384,25 @@ um_ot_data_t um_ot_get_data()
     return ot_data;
 }
 
+void um_ot_reset_error()
+{
+    needReset = true;
+}
+
+void um_ot_set_central_heating_active(bool state)
+{
+    um_nvs_write_i8(NVS_KEY_OT_CH, state ? 1 : 0);
+    enableCentralHeating = state;
+    ot_data.otch = state;
+}
+
 void um_ot_update_state(bool otch, int otdhwsp, int ottbsp)
 {
-    if (otdhwsp > 60)
-    {
-        otdhwsp = 60;
-    }
+    um_ot_set_central_heating_active(otch);
 
-    if (ottbsp > 80)
-    {
-        ottbsp = 80;
-    }
-    targetDHWTemp = otdhwsp;
     targetCHTemp = ottbsp;
-    enableCentralHeating = otch ? 1 : 0;
-    ot_data.otdhwsp = targetDHWTemp;
-    ot_data.ottbsp = targetCHTemp;
-    // esp_ot_set_dhw_setpoint(otdhwsp);
-    // esp_ot_set_boiler_temperature(ottbsp);
+    ot_data.ottbsp = ottbsp;
 
-    // esp_ot_set_boiler_status(
-    //     enableCentralHeating,
-    //     enableHotWater, enableCooling,
-    //     enableOutsideTemperatureCompensation,
-    //     enableCentralHeating2);
-    // um_nvs_write_i8(NVS_KEY_OT_DHW_SETPOINT, otdhwsp);
-    // um_nvs_write_i8(NVS_KEY_OT_TB_SETPOINT, ottbsp);
-    // um_nvs_write_i8(NVS_KEY_OT_ENABLED, otch);
-
-    um_ot_set_boiler_temp(ottbsp);
-    um_ot_set_dhw_setpoint(otdhwsp);
-
-    esp_err_t res = um_ot_set_boiler_status(
-        enableCentralHeating,
-        enableHotWater, enableCooling,
-        enableOutsideTemperatureCompensation,
-        enableCentralHeating2);
-
-    if (res == ESP_OK)
-    {
-        ESP_LOGI(TAG, "otch: %d  otdhwsp: %d ottbsp:%d", otch, otdhwsp, ottbsp);
-    }
+    targetDHWTemp = otdhwsp;
+    ot_data.otdhwsp = otdhwsp;
 }

@@ -22,6 +22,8 @@
 #define UM_TOPIC_OPENTHERM "/ot"    // Device send opentherm stztus topic
 #define UM_TOPIC_ANALOG_INPUT "/ai" // Device registration topic
 #define UM_TOPIC_NETWORK "/nw"      // Device registration topic
+#define UM_TOPIC_PING "/ping"       // Server send ping
+#define UM_TOPIC_PONG "/pong"       // Device answer as pong
 
 // cntrl/register
 // cntrl/{NAMEMAC}/st
@@ -60,3 +62,7 @@ esp_err_t um_mqtt_register_device();
 esp_err_t um_mqtt_send_config();
 
 um_mqtt_status_t um_mqtt_get_connection_state();
+
+int um_mqtt_subscribe_to(char *topic);
+
+void um_um_mqtt_subscribe_to_base_events();

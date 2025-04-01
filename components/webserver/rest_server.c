@@ -373,13 +373,36 @@ static esp_err_t adm_st_dio(httpd_req_t *req)
     return ESP_OK;
 }
 
+/**
+ * Reset opentherm
+ */
+static esp_err_t adm_st_ot_reset(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    um_ot_reset_error();
+    bool success = true;
+    cJSON_AddBoolToObject(root, "success", success);
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/**
+ * Get opentherm status
+ */
 static esp_err_t adm_st_ot(httpd_req_t *req)
 {
     um_ot_data_t data = um_ot_get_data();
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
+
+    cJSON_AddNumberToObject(root, "adapter_success", data.adapter_success);
     cJSON_AddNumberToObject(root, "status", data.status);
-    cJSON_AddNumberToObject(root, "otch", data.otch);
+    cJSON_AddBoolToObject(root, "otch", data.otch);
+    cJSON_AddBoolToObject(root, "hwa", data.hwa);
     cJSON_AddNumberToObject(root, "ottbsp", data.ottbsp);
     cJSON_AddNumberToObject(root, "otdhwsp", data.otdhwsp);
     cJSON_AddNumberToObject(root, "central_heating_active", data.central_heating_active);
@@ -387,6 +410,7 @@ static esp_err_t adm_st_ot(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "flame_on", data.flame_on);
     cJSON_AddNumberToObject(root, "modulation", data.modulation);
     cJSON_AddNumberToObject(root, "pressure", data.pressure);
+    cJSON_AddNumberToObject(root, "mod", data.mod);
     cJSON_AddNumberToObject(root, "slave_ot_version", data.slave_ot_version);
     cJSON_AddNumberToObject(root, "slave_product_version", data.slave_product_version);
     cJSON_AddNumberToObject(root, "dhw_temperature", data.dhw_temperature);
@@ -394,8 +418,46 @@ static esp_err_t adm_st_ot(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "return_temperature", data.return_temperature);
     cJSON_AddBoolToObject(root, "fault", data.is_fault);
     cJSON_AddNumberToObject(root, "fault_code", data.fault_code);
+    cJSON_AddBoolToObject(root, "ototc", data.ototc);
+    cJSON_AddBoolToObject(root, "outside_temperature", data.outside_temperature);
+    cJSON_AddBoolToObject(root, "ch2", data.ch2);
     cJSON_AddNumberToObject(root, "ntc1", get_ntc_data_channel_temp(AN_NTC_1));
     cJSON_AddNumberToObject(root, "ntc2", get_ntc_data_channel_temp(AN_NTC_2));
+
+    cJSON *cap_mod = cJSON_CreateObject();
+    cJSON_AddNumberToObject(cap_mod, "kw", data.cap_mod.kw);
+    cJSON_AddNumberToObject(cap_mod, "min_mod", data.cap_mod.min_modulation);
+    cJSON_AddItemToObject(root, "cap_mod", cap_mod);
+
+    cJSON *ch_min_max = cJSON_CreateObject();
+    cJSON_AddNumberToObject(ch_min_max, "min", data.ch_min_max.min);
+    cJSON_AddNumberToObject(ch_min_max, "max", data.ch_min_max.max);
+    cJSON_AddItemToObject(root, "ch_min_max", ch_min_max);
+
+    cJSON *dhw_min_max = cJSON_CreateObject();
+    cJSON_AddNumberToObject(dhw_min_max, "min", data.dhw_min_max.min);
+    cJSON_AddNumberToObject(dhw_min_max, "max", data.dhw_min_max.max);
+    cJSON_AddItemToObject(root, "dhw_min_max", dhw_min_max);
+
+    cJSON *flags = cJSON_CreateObject();
+    cJSON_AddBoolToObject(flags, "dhw_present", data.slave_config.dhw_present);
+    cJSON_AddNumberToObject(flags, "control_type", data.slave_config.control_type);
+    cJSON_AddNumberToObject(flags, "dhw_config", data.slave_config.dhw_config);
+    cJSON_AddBoolToObject(flags, "dhw_present", data.slave_config.dhw_present);
+    cJSON_AddBoolToObject(flags, "pump_control_allowed", data.slave_config.pump_control_allowed);
+    cJSON_AddBoolToObject(flags, "ch2_present", data.slave_config.ch2_present);
+    cJSON_AddItemToObject(root, "flags", flags);
+
+    cJSON *asf_flags = cJSON_CreateObject();
+    cJSON_AddBoolToObject(asf_flags, "is_service_request", data.asf_flags.is_service_request);
+    cJSON_AddBoolToObject(asf_flags, "can_reset", data.asf_flags.can_reset);
+    cJSON_AddBoolToObject(asf_flags, "is_low_water_press", data.asf_flags.is_low_water_press);
+    cJSON_AddBoolToObject(asf_flags, "is_gas_flame_fault", data.asf_flags.is_gas_flame_fault);
+    cJSON_AddBoolToObject(asf_flags, "is_air_press_fault", data.asf_flags.is_air_press_fault);
+    cJSON_AddBoolToObject(asf_flags, "is_water_over_temp", data.asf_flags.is_water_over_temp);
+    cJSON_AddNumberToObject(asf_flags, "fault_code", data.asf_flags.fault_code);
+    cJSON_AddNumberToObject(asf_flags, "diag_code", data.asf_flags.diag_code);
+    cJSON_AddItemToObject(root, "asf_flags", asf_flags);
 
     char *res = cJSON_PrintUnformatted(root);
     httpd_resp_sendstr(req, res);
@@ -437,7 +499,34 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
         int otdhwsp = cJSON_GetObjectItem(state, "otdhwsp")->valueint;
         int ottbsp = cJSON_GetObjectItem(state, "ottbsp")->valueint;
 
+        // установка модуляции горелки
+        int modulation_max_level = cJSON_HasObjectItem(state, "mod") ? cJSON_GetObjectItem(state, "mod")->valueint : -1;
+        if (modulation_max_level < 0)
+        {
+            modulation_max_level = 100;
+        }
+        um_ot_set_modulation_level(modulation_max_level);
+
         um_ot_update_state(otch, otdhwsp, ottbsp);
+
+        if (cJSON_HasObjectItem(state, "hwa"))
+        {
+            bool hwa = cJSON_IsTrue(cJSON_GetObjectItem(state, "hwa"));
+            um_ot_set_hot_water_active(hwa);
+        }
+
+        um_ot_set_central_heating_active(otch);
+
+        // активация второго контура отопления (двухконтурный котел)
+        bool ch2_enabled = cJSON_HasObjectItem(state, "ch2") ? cJSON_GetObjectItem(state, "ch2")->valueint == 1 : false;
+        um_ot_set_ch2(ch2_enabled);
+
+        // температурный датчки (наружний)
+        if (cJSON_HasObjectItem(state, "ototc"))
+        {
+            cJSON *ototc = cJSON_GetObjectItem(state, "ototc");
+            um_ot_set_outside_temp_comp(cJSON_IsTrue(ototc));
+        }
     }
 
     cJSON_AddBoolToObject(res, "success", success);
@@ -827,13 +916,20 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_dio_uri);
 
-    // DIO get
+    // OT get
     httpd_uri_t adm_st_ot_uri = {
         .uri = "/adm/st/ot",
         .method = HTTP_GET,
         .handler = adm_st_ot,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_ot_uri);
+
+    httpd_uri_t adm_st_ot_reset_uri = {
+        .uri = "/adm/st/ot/reset",
+        .method = HTTP_POST,
+        .handler = adm_st_ot_reset,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_ot_reset_uri);
 
     // adm/settings get
     httpd_uri_t adm_settings_uri = {

@@ -350,10 +350,21 @@ unsigned long esp_ot_get_slave_product_version()
  *
  * @return  long
  */
-unsigned long ot_get_slave_configuration()
+esp_ot_slave_config_t esp_ot_get_slave_configuration()
 {
     unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_S_CONFIG_S_MEMEBER_ID_CODE, 0));
-    return esp_ot_is_valid_response(response) ? response : 0;
+    uint16_t result = esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+    uint8_t member_id_code = (uint8_t)(result & 0x00FF);
+    uint8_t flags = (uint8_t)((result & 0xFF00) >> 8);
+    esp_ot_slave_config_t slave_config = {
+        .dhw_present = flags & (1 << 0),
+        .control_type = flags & (1 << 1),
+        .cooling_supported = flags & (1 << 2),
+        .dhw_config = flags & (1 << 3),
+        .pump_control_allowed = flags & (1 << 4),
+        .ch2_present = flags & (1 << 5)};
+
+    return slave_config;
 }
 
 /**
@@ -690,7 +701,7 @@ unsigned long esp_ot_set_boiler_status(
 /**
  * Set boler temperature
  *
- * @param   float temperature target temperature setpoint
+ * @param   float temperature target temperature
  *
  * @return  bool
  */
@@ -698,28 +709,6 @@ bool esp_ot_set_boiler_temperature(float temperature)
 {
     unsigned long response = esp_ot_send_request(esp_ot_build_set_boiler_temperature_request(temperature));
     return esp_ot_is_valid_response(response);
-}
-
-/**
- * Get current boiler temperature
- *
- * @return  float   target temperature
- */
-float esp_ot_get_boiler_temperature()
-{
-    unsigned long response = esp_ot_send_request(esp_ot_build_get_boiler_temperature_request());
-    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
-}
-
-/**
- * Get return temperature data
- *
- * @return  float
- */
-float esp_ot_get_return_temperature()
-{
-    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TRET, 0));
-    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
 }
 
 /**
@@ -737,6 +726,160 @@ bool esp_ot_set_dhw_setpoint(float temperature)
 }
 
 /**
+ * Get current boiler temperature
+ *
+ * @return  float   target temperature
+ */
+float esp_ot_get_boiler_temperature()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_get_boiler_temperature_request());
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get DHW setpoint
+ *
+ * @return  float
+ */
+float esp_ot_get_dhw_setpoint()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TDHW_SET, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get CH setpoint temperature
+ *
+ * @return  float
+ */
+float esp_ot_get_ch_max_setpoint()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_MAX_TSET, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+esp_ot_min_max_t esp_ot_get_ch_upper_lower_bounds()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_MAX_TSET_UB_MAX_TSET_LB, 0));
+    uint16_t result = esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+
+    uint8_t min = (uint8_t)(result & 0x00FF);
+    uint8_t max = (uint8_t)((result & 0xFF00) >> 8);
+    esp_ot_min_max_t min_max = {
+        .min = min,
+        .max = max};
+    return min_max;
+}
+
+esp_ot_min_max_t esp_ot_get_dhw_upper_lower_bounds()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TDHW_SET_UBT_DHW_SET_LB, 0));
+    uint16_t result = esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+    uint8_t min = (uint8_t)(result & 0x00FF);
+    uint8_t max = (uint8_t)((result & 0xFF00) >> 8);
+    esp_ot_min_max_t min_max = {
+        .min = min,
+        .max = max};
+    return min_max;
+}
+
+/**
+ * OTC heat curve ratio upper & lower bounds for adjustment
+ * @return  uint16_t
+ */
+esp_ot_min_max_t esp_ot_get_heat_curve_ul_bounds()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_OTC_HEAT_CURVE_UL_BOUNDS, 0));
+    uint16_t result = esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+    uint8_t min = (uint8_t)(result & 0x00FF);
+    uint8_t max = (uint8_t)((result & 0xFF00) >> 8);
+    esp_ot_min_max_t min_max = {
+        .min = min,
+        .max = max};
+    return min_max;
+}
+
+/**
+ * Maximum boiler capacity(kW) / Minimum boiler modulation level(%)
+ * @return  uint16_t
+ */
+esp_ot_cap_mod_t esp_ot_get_max_capacity_min_modulation()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_MAX_CAPACITY_MIN_MOD_LEVEL, 0));
+    uint16_t result = esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+    uint8_t mod = (uint8_t)(result & 0x00FF);
+    uint8_t kw = (uint8_t)((result & 0xFF00) >> 8);
+    esp_ot_cap_mod_t cap_mod = {
+        .kw = kw,
+        .min_modulation = mod};
+    return cap_mod;
+}
+
+/**
+ *
+ * firsp part uint8_t
+ * bit: description [ clear/0, set/1]
+ * 0: Service request [service not req’d, service required]
+ * 1: Lockout-reset [ remote reset disabled, rr enabled]
+ * 2: Low water press [no WP fault, water pressure fault]
+ * 3: Gas/flame fault [ no G/F fault, gas/flame fault ]
+ * 4: Air press fault [ no AP fault, air pressure fault ]
+ * 5: Water over-temp[ no OvT fault, over-temperat. Fault]
+ * 6: reserved
+ * 7: reserved
+ * 00001010
+ * second part uint8_t - OEM diagnostic code
+ */
+esp_ot_asf_flags_t esp_ot_get_asf_flags()
+{
+    uint16_t faults = esp_ot_get_fault_code();
+    uint8_t error_code = (uint8_t)faults;
+    uint8_t fault_codes = (uint8_t)((faults & 0xFF00) >> 8);
+
+    // NUM & (1<<N)
+    esp_ot_asf_flags_t flags = {
+        .diag_code = esp_ot_get_oem_diagnostic_code(),
+        .fault_code = error_code,
+        .is_service_request = fault_codes & (1 << 0), // NUM & (1<<N)
+        .can_reset = fault_codes & (1 << 1),
+        .is_low_water_press = fault_codes & (1 << 2),
+        .is_gas_flame_fault = fault_codes & (1 << 3),
+        .is_air_press_fault = fault_codes & (1 << 4),
+        .is_water_over_temp = fault_codes & (1 << 5),
+    };
+
+    return flags;
+}
+
+uint16_t esp_ot_get_oem_diagnostic_code()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_OEM_DDIAGNOSTIC_CODE, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : 0;
+}
+
+/**
+ * Get return temperature data
+ *
+ * @return  float
+ */
+float esp_ot_get_return_temperature()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TRET, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get outside temperature
+ *
+ * @return  float
+ */
+float esp_ot_get_outside_temperature()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TOUTSIDE, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
  * Get hot water temperature
  *
  * @return  float
@@ -744,6 +887,45 @@ bool esp_ot_set_dhw_setpoint(float temperature)
 float esp_ot_get_dhw_temperature()
 {
     unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TDHW, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get CH2 flow temperature
+ *
+ * @return  float
+ */
+float esp_ot_get_ch2_flow()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TR_SET_CH2, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get hot water temperature
+ *
+ * @return  float
+ */
+float esp_ot_get_dhw2_temperature()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TDHW2, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+/**
+ * Get hot exhaust temperature
+ *
+ * @return  float
+ */
+float esp_ot_get_exhaust_temperature()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_TEXHAUST, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+}
+
+float esp_ot_get_flow_rate()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_DHW_FLOW_RATE, 0));
     return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
 }
 
@@ -759,14 +941,16 @@ float esp_ot_get_modulation()
 }
 
 /**
- * Get modulation level setting
+ * Maximum relative modulation level setting(%)
  *
  * @return  float
  */
-float esp_ot_get_modulation_level_setting()
+bool esp_ot_set_modulation_level(int percent)
 {
-    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_MAX_REL_MOD_LEVEL_SETTINGG, 0));
-    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : 0;
+    unsigned int data = percent;
+    unsigned long response = esp_ot_send_request(
+        esp_ot_build_request(OT_WRITE_DATA, MSG_ID_MAX_REL_MOD_LEVEL_SETTING, data));
+    return esp_ot_is_valid_response(response);
 }
 
 /**
@@ -788,6 +972,35 @@ float esp_ot_get_pressure()
 unsigned char esp_ot_get_fault()
 {
     return ((esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_ASF_FLAGS, 0)) >> 8) & 0xff);
+}
+
+uint16_t esp_ot_read_dhw_pump_starts()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_DHW_PUPM_VALVE_STARTS, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : -1;
+}
+
+uint16_t esp_ot_read_dhw_pump_hours()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_DHW_PUMP_VALVE_OPERATION_HOURS, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : -1;
+}
+
+uint16_t esp_ot_read_ch_pump_starts()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_CH_PUMP_STARTS, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : -1;
+}
+
+uint16_t esp_ot_read_ch_pump_hours()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_CH_PUMP_OPERATION_HOURS, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_uint(response) : -1;
+}
+
+uint16_t esp_ot_get_fault_code()
+{
+    return ((esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_ASF_FLAGS, 0))));
 }
 
 /**

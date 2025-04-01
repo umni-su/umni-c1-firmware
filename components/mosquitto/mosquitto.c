@@ -6,7 +6,9 @@
 #include "../config/config.h"
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
+#include "../dio/dio.h"
 #include "../systeminfo/systeminfo.h"
+#include "../opentherm/opentherm_operations.h"
 
 const char *MQTT_TAG = "mqtt";
 
@@ -58,40 +60,109 @@ static void log_error_if_nonzero(const char *message, int error_code)
 
 void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
-    cJSON *payload = cJSON_CreateObject();
-    char *topic = NULL;
-    switch (id)
+    if (
+        id == EV_STATUS_CHANGED_DI ||
+        id == EV_STATUS_CHANGED_DO ||
+        id == EV_STATUS_CHANGED_NTC ||
+        id == EV_STATUS_CHANGED_OW ||
+        id == EV_OT_SET_DATA)
     {
-    case EV_STATUS_CHANGED_DI:
-    case EV_STATUS_CHANGED_DO:
-        topic = (id == EV_STATUS_CHANGED_DI) ? UM_TOPIC_INPUT : UM_TOPIC_RELAY;
-        um_ev_message_dio *status_dio = (um_ev_message_dio *)event_data;
+        cJSON *payload = cJSON_CreateObject();
+        char *topic = NULL;
+        switch (id)
+        {
+        case EV_STATUS_CHANGED_DI:
+        case EV_STATUS_CHANGED_DO:
+            topic = (id == EV_STATUS_CHANGED_DI) ? UM_TOPIC_INPUT : UM_TOPIC_RELAY;
+            um_ev_message_dio *status_dio = (um_ev_message_dio *)event_data;
 
-        cJSON_AddNumberToObject(payload, "index", status_dio->index);
-        cJSON_AddNumberToObject(payload, "level", status_dio->level);
+            cJSON_AddNumberToObject(payload, "index", status_dio->index);
+            cJSON_AddNumberToObject(payload, "level", status_dio->level);
 
-        break;
-    case EV_STATUS_CHANGED_NTC:
-        topic = UM_TOPIC_NTC;
-        um_ev_message_ntc *status_ntc = (um_ev_message_ntc *)event_data;
-        cJSON_AddNumberToObject(payload, "channel", status_ntc->channel);
-        cJSON_AddNumberToObject(payload, "temp", status_ntc->temp);
-        break;
+            break;
+        case EV_STATUS_CHANGED_NTC:
+            topic = UM_TOPIC_NTC;
+            um_ev_message_ntc *status_ntc = (um_ev_message_ntc *)event_data;
+            cJSON_AddNumberToObject(payload, "channel", status_ntc->channel);
+            cJSON_AddNumberToObject(payload, "temp", status_ntc->temp);
+            break;
 
-    case EV_STATUS_CHANGED_OW:
-        topic = UM_TOPIC_STATUS_ONEWIRE;
-        um_ev_message_onewire *status_onewire = (um_ev_message_onewire *)event_data;
+        case EV_STATUS_CHANGED_OW:
+            topic = UM_TOPIC_STATUS_ONEWIRE;
+            um_ev_message_onewire *status_onewire = (um_ev_message_onewire *)event_data;
 
-        cJSON_AddStringToObject(payload, "sn", status_onewire->sn);
-        cJSON_AddNumberToObject(payload, "temp", status_onewire->temp);
-        break;
+            cJSON_AddStringToObject(payload, "sn", status_onewire->sn);
+            cJSON_AddNumberToObject(payload, "temp", status_onewire->temp);
+            break;
+
+        case EV_OT_SET_DATA:
+            topic = UM_TOPIC_OPENTHERM;
+            um_ot_data_t data = um_ot_get_data();
+
+            cJSON_AddNumberToObject(payload, "status", data.status);
+            cJSON_AddBoolToObject(payload, "otch", data.otch);
+            cJSON_AddNumberToObject(payload, "ottbsp", data.ottbsp);
+            cJSON_AddNumberToObject(payload, "otdhwsp", data.otdhwsp);
+            cJSON_AddBoolToObject(payload, "hwa", data.hwa);
+            cJSON_AddNumberToObject(payload, "central_heating_active", data.central_heating_active);
+            cJSON_AddNumberToObject(payload, "hot_water_active", data.hot_water_active);
+            cJSON_AddNumberToObject(payload, "flame_on", data.flame_on);
+            cJSON_AddNumberToObject(payload, "modulation", data.modulation);
+            cJSON_AddNumberToObject(payload, "pressure", data.pressure);
+            cJSON_AddNumberToObject(payload, "mod", data.mod);
+            cJSON_AddNumberToObject(payload, "slave_ot_version", data.slave_ot_version);
+            cJSON_AddNumberToObject(payload, "slave_product_version", data.slave_product_version);
+            cJSON_AddNumberToObject(payload, "dhw_temperature", data.dhw_temperature);
+            cJSON_AddNumberToObject(payload, "boiler_temperature", data.boiler_temperature);
+            cJSON_AddNumberToObject(payload, "return_temperature", data.return_temperature);
+            cJSON_AddBoolToObject(payload, "fault", data.is_fault);
+            cJSON_AddNumberToObject(payload, "fault_code", data.fault_code);
+            // cJSON_AddNumberToObject(payload, "ntc1", get_ntc_data_channel_temp(CONFIG_UMNI_NTC_1));
+            // cJSON_AddNumberToObject(payload, "ntc2", get_ntc_data_channel_temp(CONFIG_UMNI_NTC_2));
+
+            cJSON *cap_mod = cJSON_CreateObject();
+            cJSON_AddNumberToObject(cap_mod, "kw", data.cap_mod.kw);
+            cJSON_AddNumberToObject(cap_mod, "min_mod", data.cap_mod.min_modulation);
+            cJSON_AddItemToObject(payload, "cap_mod", cap_mod);
+
+            cJSON *ch_min_max = cJSON_CreateObject();
+            cJSON_AddNumberToObject(ch_min_max, "min", data.ch_min_max.min);
+            cJSON_AddNumberToObject(ch_min_max, "max", data.ch_min_max.max);
+            cJSON_AddItemToObject(payload, "ch_min_max", ch_min_max);
+
+            cJSON *dhw_min_max = cJSON_CreateObject();
+            cJSON_AddNumberToObject(dhw_min_max, "min", data.dhw_min_max.min);
+            cJSON_AddNumberToObject(dhw_min_max, "max", data.dhw_min_max.max);
+            cJSON_AddItemToObject(payload, "dhw_min_max", dhw_min_max);
+
+            cJSON *flags = cJSON_CreateObject();
+            cJSON_AddBoolToObject(flags, "dhw_present", data.slave_config.dhw_present);
+            cJSON_AddNumberToObject(flags, "control_type", data.slave_config.control_type);
+            cJSON_AddNumberToObject(flags, "dhw_config", data.slave_config.dhw_config);
+            cJSON_AddBoolToObject(flags, "dhw_present", data.slave_config.dhw_present);
+            cJSON_AddBoolToObject(flags, "pump_control_allowed", data.slave_config.pump_control_allowed);
+            cJSON_AddBoolToObject(flags, "ch2_present", data.slave_config.ch2_present);
+            cJSON_AddItemToObject(payload, "flags", flags);
+
+            cJSON *asf_flags = cJSON_CreateObject();
+            cJSON_AddBoolToObject(asf_flags, "is_service_request", data.asf_flags.is_service_request);
+            cJSON_AddBoolToObject(asf_flags, "can_reset", data.asf_flags.can_reset);
+            cJSON_AddBoolToObject(asf_flags, "is_low_water_press", data.asf_flags.is_low_water_press);
+            cJSON_AddBoolToObject(asf_flags, "is_gas_flame_fault", data.asf_flags.is_gas_flame_fault);
+            cJSON_AddBoolToObject(asf_flags, "is_air_press_fault", data.asf_flags.is_air_press_fault);
+            cJSON_AddBoolToObject(asf_flags, "is_water_over_temp", data.asf_flags.is_water_over_temp);
+            cJSON_AddNumberToObject(asf_flags, "fault_code", data.asf_flags.fault_code);
+            cJSON_AddNumberToObject(asf_flags, "diag_code", data.asf_flags.diag_code);
+            cJSON_AddItemToObject(payload, "asf_flags", asf_flags);
+            break;
+        }
+
+        char *json = cJSON_PrintUnformatted(payload);
+        um_mqtt_publish_data(topic, json);
+        free((void *)json);
+        cJSON_Delete(payload);
+        ESP_LOGW("HEAP", "[watch_events (mqtt)] Free memory: %ld bytes", esp_get_free_heap_size());
     }
-
-    char *json = cJSON_PrintUnformatted(payload);
-    um_mqtt_publish_data(topic, json);
-    free((void *)json);
-    cJSON_Delete(payload);
-    ESP_LOGW("HEAP", "[watch_events (mqtt)] Free memory: %ld bytes", esp_get_free_heap_size());
 }
 
 /*
@@ -120,10 +191,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         // SUBSCRIBE HERE!
 
+        um_um_mqtt_subscribe_to_base_events();
+
         // msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
         // ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
 
-        // msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
         // ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
         // msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
@@ -152,6 +224,23 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
         // printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         // printf("DATA=%.*s\r\n", event->data_len, event->data);
+
+        cJSON *json = cJSON_Parse(event->data);
+        cJSON *topic = cJSON_HasObjectItem(json, "topic") ? cJSON_GetObjectItem(json, "topic") : NULL;
+        if (topic != NULL)
+        {
+            if (strcmp(topic->valuestring, "rel") == 0)
+            {
+                do_port_index_t index = cJSON_GetObjectItem(json, "index")->valueint;
+                do_level_t level = cJSON_GetObjectItem(json, "level")->valueint;
+                do_set_level(index, level);
+            }
+        }
+
+        cJSON_Delete(json);
+
+        // TOPIC=manage/umni0a99f0/rel
+        // DATA={"index":2,"level":1}
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_ERROR");
@@ -328,4 +417,25 @@ esp_err_t um_mqtt_send_config()
 um_mqtt_status_t um_mqtt_get_connection_state()
 {
     return connection_status;
+}
+
+int um_mqtt_subscribe_to(char *topic)
+{
+    size_t len = strlen(UM_TOPIC_PREFIX_MANAGE) + strlen(name) + strlen(topic) + 1;
+    char t[len];
+    sprintf(t, "%s%s%s", UM_TOPIC_PREFIX_MANAGE, name, topic);
+
+    msg_id = esp_mqtt_client_subscribe(client, t, 1);
+    ESP_LOGI(MQTT_TAG, "Sent subscribe successful, msg_id=%d, topic=%s", msg_id, t);
+
+    return msg_id;
+}
+
+void um_um_mqtt_subscribe_to_base_events()
+{
+    um_mqtt_subscribe_to(UM_TOPIC_PING);
+
+    um_mqtt_subscribe_to(UM_TOPIC_RELAY);
+
+    um_mqtt_subscribe_to(UM_TOPIC_OPENTHERM);
 }
