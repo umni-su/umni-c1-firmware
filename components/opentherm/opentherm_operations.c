@@ -395,13 +395,17 @@ void um_ot_init()
     // Get or set TB sp;
     targetCHTemp = um_nvs_read_i8(NVS_KEY_OT_TB_SETPOINT);
 
+    enableHotWater = um_nvs_read_i8(NVS_KEY_OT_DHW_EN) == 1;
+
     ot_data.otdhwsp = targetDHWTemp;
     ot_data.ottbsp = targetCHTemp;
     ot_data.otch = enableCentralHeating;
     ot_data.mod = um_nvs_read_i8(NVS_KEY_OT_MOD);
     ot_data.othcr = um_nvs_read_i8(NVS_KEY_OT_HCR);
 
-    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 13, &ot_handle, 1);
+    ot_data.hwa = enableHotWater;
+
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &ot_handle, 1);
 }
 
 um_ot_data_t um_ot_get_data()

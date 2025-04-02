@@ -508,9 +508,11 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
         int ottbsp = cJSON_GetObjectItem(state, "ottbsp")->valueint;
 
         // установка модуляции горелки
-        int modulation_max_level = cJSON_HasObjectItem(state, "mod") ? cJSON_GetObjectItem(state, "mod")->valueint : -1;
-
-        um_ot_set_modulation_level(modulation_max_level);
+        if (cJSON_HasObjectItem(state, "mod"))
+        {
+            int modulation_max_level = cJSON_GetObjectItem(state, "mod")->valueint;
+            um_ot_set_modulation_level(modulation_max_level);
+        }
 
         um_ot_update_state(otch, otdhwsp, ottbsp);
 
