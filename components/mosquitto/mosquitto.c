@@ -115,6 +115,7 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
             cJSON_AddNumberToObject(payload, "dhw_temperature", data.dhw_temperature);
             cJSON_AddNumberToObject(payload, "boiler_temperature", data.boiler_temperature);
             cJSON_AddNumberToObject(payload, "return_temperature", data.return_temperature);
+            cJSON_AddNumberToObject(payload, "outside_temperature", data.outside_temperature);
             cJSON_AddBoolToObject(payload, "fault", data.is_fault);
             cJSON_AddNumberToObject(payload, "fault_code", data.fault_code);
             // cJSON_AddNumberToObject(payload, "ntc1", get_ntc_data_channel_temp(CONFIG_UMNI_NTC_1));

@@ -400,17 +400,21 @@ static esp_err_t adm_st_ot(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     cJSON_AddNumberToObject(root, "adapter_success", data.adapter_success);
+    cJSON_AddBoolToObject(root, "ready", data.ready);
     cJSON_AddNumberToObject(root, "status", data.status);
     cJSON_AddBoolToObject(root, "otch", data.otch);
+    cJSON_AddBoolToObject(root, "ototc", data.ototc);
     cJSON_AddBoolToObject(root, "hwa", data.hwa);
+    cJSON_AddBoolToObject(root, "ch2", data.ch2);
     cJSON_AddNumberToObject(root, "ottbsp", data.ottbsp);
     cJSON_AddNumberToObject(root, "otdhwsp", data.otdhwsp);
+    cJSON_AddNumberToObject(root, "othcr", data.othcr);
+    cJSON_AddNumberToObject(root, "mod", data.mod);
     cJSON_AddNumberToObject(root, "central_heating_active", data.central_heating_active);
     cJSON_AddNumberToObject(root, "hot_water_active", data.hot_water_active);
     cJSON_AddNumberToObject(root, "flame_on", data.flame_on);
     cJSON_AddNumberToObject(root, "modulation", data.modulation);
     cJSON_AddNumberToObject(root, "pressure", data.pressure);
-    cJSON_AddNumberToObject(root, "mod", data.mod);
     cJSON_AddNumberToObject(root, "slave_ot_version", data.slave_ot_version);
     cJSON_AddNumberToObject(root, "slave_product_version", data.slave_product_version);
     cJSON_AddNumberToObject(root, "dhw_temperature", data.dhw_temperature);
@@ -418,11 +422,15 @@ static esp_err_t adm_st_ot(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "return_temperature", data.return_temperature);
     cJSON_AddBoolToObject(root, "fault", data.is_fault);
     cJSON_AddNumberToObject(root, "fault_code", data.fault_code);
-    cJSON_AddBoolToObject(root, "ototc", data.ototc);
-    cJSON_AddBoolToObject(root, "outside_temperature", data.outside_temperature);
-    cJSON_AddBoolToObject(root, "ch2", data.ch2);
+    cJSON_AddNumberToObject(root, "outside_temperature", data.outside_temperature);
     cJSON_AddNumberToObject(root, "ntc1", get_ntc_data_channel_temp(AN_NTC_1));
     cJSON_AddNumberToObject(root, "ntc2", get_ntc_data_channel_temp(AN_NTC_2));
+
+    cJSON *curve_bounds = cJSON_CreateObject();
+    cJSON_AddNumberToObject(curve_bounds, "min", data.curve_bounds.min);
+    cJSON_AddNumberToObject(curve_bounds, "max", data.curve_bounds.max);
+    cJSON_AddItemToObject(root, "curve_bounds", curve_bounds);
+    cJSON_AddNumberToObject(root, "heat_curve_ratio", data.heat_curve_ratio);
 
     cJSON *cap_mod = cJSON_CreateObject();
     cJSON_AddNumberToObject(cap_mod, "kw", data.cap_mod.kw);
@@ -501,10 +509,7 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
 
         // установка модуляции горелки
         int modulation_max_level = cJSON_HasObjectItem(state, "mod") ? cJSON_GetObjectItem(state, "mod")->valueint : -1;
-        if (modulation_max_level < 0)
-        {
-            modulation_max_level = 100;
-        }
+
         um_ot_set_modulation_level(modulation_max_level);
 
         um_ot_update_state(otch, otdhwsp, ottbsp);
@@ -513,6 +518,12 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
         {
             bool hwa = cJSON_IsTrue(cJSON_GetObjectItem(state, "hwa"));
             um_ot_set_hot_water_active(hwa);
+        }
+
+        if (cJSON_HasObjectItem(state, "othcr"))
+        {
+            int hcr = cJSON_GetObjectItem(state, "othcr")->valueint;
+            um_ot_set_heat_curve_ratio(hcr);
         }
 
         um_ot_set_central_heating_active(otch);

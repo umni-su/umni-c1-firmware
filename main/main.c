@@ -55,15 +55,15 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             break;
         case EV_NVS_OPENED:
             ethernet_start();
+            um_ot_init();
             break;
 
         case EV_SYSTEM_INSTALLED:
             do_blink_led_stat_start_working();
             um_systeminfo_init();
-            um_ot_init();
-            init_adc();
             onewire_init_config();
             um_ota_mark_valid();
+            init_adc();
             break;
 
         case EV_NTP_SYNC_SUCCESS:

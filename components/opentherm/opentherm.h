@@ -319,3 +319,7 @@ uint16_t esp_ot_read_dhw_pump_hours();
 uint16_t esp_ot_read_ch_pump_hours();
 
 uint16_t esp_ot_read_ch_pump_starts();
+
+bool esp_ot_set_otc_curve_ratio(int percent);
+
+float esp_ot_get_heat_curve_ratio();

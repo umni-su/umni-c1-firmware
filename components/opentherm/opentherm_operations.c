@@ -66,6 +66,7 @@ void esp_ot_control_task_handler(void *pvParameter)
 
     while (true)
     {
+        bool stat = false;
         esp_err_t res = um_ot_set_boiler_status(
             enableCentralHeating,
             enableHotWater, enableCooling,
@@ -93,7 +94,6 @@ void esp_ot_control_task_handler(void *pvParameter)
 
         if (!is_busy)
         {
-
             is_busy = true;
 
             ESP_LOGI(TAG, "\r\n====== OPENTHERM DATA =====");
@@ -104,31 +104,45 @@ void esp_ot_control_task_handler(void *pvParameter)
 
             if (ot_response_status == OT_STATUS_SUCCESS)
             {
+                // установка модуляции
+                stat = esp_ot_set_modulation_level(ot_data.mod);
+                if (!stat)
+                {
+                    ESP_LOGE(TAG, "Error set modulation level");
+                }
+                else
+                {
+                    ESP_LOGI(TAG, "Modulation level set success to %d", ot_data.mod);
+                }
+                // установка кривой нагрева
+                if (enableOutsideTemperatureCompensation)
+                {
+                    if (ot_data.othcr > 0 && ot_data.othcr < 100)
+                    {
+                        stat = esp_ot_set_otc_curve_ratio(ot_data.othcr);
+                        if (!stat)
+                        {
+                            ESP_LOGE(TAG, "Error set heat curve ratio");
+                        }
+                        else
+                        {
+                            ESP_LOGE(TAG, "Heat curve ratio set success");
+                        }
+                    }
+                }
+
+                ot_data.ready = false;
+
                 esp_ot_slave_config_t slave = esp_ot_get_slave_configuration();
                 ot_data.slave_config = slave;
 
-                if (!initialized)
-                {
+                const float slave_ot_version = esp_ot_get_slave_ot_version();
+                const unsigned long slave_product_version = esp_ot_get_slave_product_version();
+                ESP_LOGI(TAG, "Slave OT Version: %.1f", slave_ot_version);
+                ESP_LOGI(TAG, "Slave Version: %08lX", slave_product_version);
 
-                    ot_data.mod = um_nvs_read_i8(NVS_KEY_OT_MOD);
-                    // установка начального значения модуляции горелки, если в NVS нет значения, или оно < 0
-                    if (ot_data.mod < 0)
-                    {
-                        ot_data.mod = 100;
-                        um_nvs_write_i8(NVS_KEY_OT_MOD, ot_data.mod);
-                    }
-
-                    const float slave_ot_version = esp_ot_get_slave_ot_version();
-                    const unsigned long slave_product_version = esp_ot_get_slave_product_version();
-                    ESP_LOGI(TAG, "Slave OT Version: %.1f", slave_ot_version);
-                    ESP_LOGI(TAG, "Slave Version: %08lX", slave_product_version);
-
-                    ot_data.slave_ot_version = slave_ot_version;
-                    ot_data.slave_product_version = slave_product_version;
-                    initialized = true;
-                }
-
-                esp_ot_set_modulation_level(ot_data.mod);
+                ot_data.slave_ot_version = slave_ot_version;
+                ot_data.slave_product_version = slave_product_version;
 
                 const float modulation = esp_ot_get_modulation();
                 const float pressure = esp_ot_get_pressure();
@@ -201,6 +215,13 @@ void esp_ot_control_task_handler(void *pvParameter)
                 ot_data.cap_mod = cap_mod;
                 ESP_LOGI(TAG, "ch_bounds cap: %d kw, min_mod: %d", ot_data.cap_mod.kw, ot_data.cap_mod.min_modulation);
 
+                // кривая нагрева - верхние и нижние границы
+                ot_data.curve_bounds = esp_ot_get_heat_curve_ul_bounds();
+                ESP_LOGI(TAG, "curve_bounds min: %d, max: %d", ot_data.curve_bounds.min, ot_data.curve_bounds.max);
+                // чтение значения кривой с котла
+                ot_data.heat_curve_ratio = esp_ot_get_heat_curve_ratio();
+                ESP_LOGI(TAG, "heat_curve_ratio: %.1f", ot_data.heat_curve_ratio);
+
                 if (ot_data.slave_config.pump_control_allowed && need_read_pump)
                 {
                     uint16_t val = esp_ot_read_dhw_pump_starts();
@@ -215,8 +236,8 @@ void esp_ot_control_task_handler(void *pvParameter)
                     val = esp_ot_read_ch_pump_hours();
                     ESP_LOGI(TAG, "ch_pump_hours : %d", val);
                 }
-
                 ot_data.adapter_success = true;
+                ot_data.ready = true;
             }
             else
             {
@@ -316,8 +337,10 @@ void um_ot_set_outside_temp_comp(bool state)
     enableOutsideTemperatureCompensation = state;
 }
 
-void um_ot_set_modulation_level(char level)
+void um_ot_set_modulation_level(int level)
 {
+    if (level < 0 || level > 99)
+        level = 99;
     um_nvs_write_i8(NVS_KEY_OT_MOD, level);
     ot_data.mod = level;
 }
@@ -375,8 +398,10 @@ void um_ot_init()
     ot_data.otdhwsp = targetDHWTemp;
     ot_data.ottbsp = targetCHTemp;
     ot_data.otch = enableCentralHeating;
+    ot_data.mod = um_nvs_read_i8(NVS_KEY_OT_MOD);
+    ot_data.othcr = um_nvs_read_i8(NVS_KEY_OT_HCR);
 
-    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &ot_handle, 1);
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 13, &ot_handle, 1);
 }
 
 um_ot_data_t um_ot_get_data()
@@ -394,6 +419,12 @@ void um_ot_set_central_heating_active(bool state)
     um_nvs_write_i8(NVS_KEY_OT_CH, state ? 1 : 0);
     enableCentralHeating = state;
     ot_data.otch = state;
+}
+
+void um_ot_set_heat_curve_ratio(int ratio)
+{
+    um_nvs_write_i8(NVS_KEY_OT_HCR, ratio);
+    ot_data.othcr = ratio;
 }
 
 void um_ot_update_state(bool otch, int otdhwsp, int ottbsp)

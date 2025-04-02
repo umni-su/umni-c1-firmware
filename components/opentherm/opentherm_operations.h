@@ -3,11 +3,13 @@
 typedef struct
 {
     bool adapter_success;
+    bool ready;  // data ready or not
     bool otch;   // from NVS
     int otdhwsp; // from NVS
     int ottbsp;  // from NVS
     bool ch2;    // from NVS
     bool ototc;  // from NVS
+    int othcr;   // from NVS
     bool hwa;    // from NVS
     int status;
     bool central_heating_active;
@@ -15,7 +17,7 @@ typedef struct
     bool flame_on;
     float modulation;
     bool is_fault;
-    char fault_code;
+    int fault_code;
     float return_temperature;
     float dhw_temperature;
     float boiler_temperature;
@@ -26,11 +28,12 @@ typedef struct
     float dhw_setpoint;
     float outside_temperature;
     float flow_rate;
-
+    float heat_curve_ratio;
     float flow_rate_ch2;
-    float mod; // modulation level setting
+    int mod; // modulation level setting
     esp_ot_min_max_t dhw_min_max;
     esp_ot_min_max_t ch_min_max;
+    esp_ot_min_max_t curve_bounds;
     esp_ot_cap_mod_t cap_mod;
     esp_ot_asf_flags_t asf_flags;
     esp_ot_slave_config_t slave_config;
@@ -66,6 +69,8 @@ void um_ot_set_ch2(bool active);
 
 void um_ot_set_outside_temp_comp(bool state);
 
-void um_ot_set_modulation_level(char level);
+void um_ot_set_modulation_level(int level);
 
 void um_ot_set_hot_water_active(bool hwa);
+
+void um_ot_set_heat_curve_ratio(int ratio);

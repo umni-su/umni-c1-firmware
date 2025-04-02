@@ -800,6 +800,16 @@ esp_ot_min_max_t esp_ot_get_heat_curve_ul_bounds()
 }
 
 /**
+ * OTC heat curve ratio upper & lower bounds for adjustment
+ * @return  uint16_t
+ */
+float esp_ot_get_heat_curve_ratio()
+{
+    unsigned long response = esp_ot_send_request(esp_ot_build_request(OT_READ_DATA, MSG_ID_OTC_CURVE_RATIO, 0));
+    return esp_ot_is_valid_response(response) ? esp_ot_get_float(response) : -1;
+}
+
+/**
  * Maximum boiler capacity(kW) / Minimum boiler modulation level(%)
  * @return  uint16_t
  */
@@ -950,6 +960,14 @@ bool esp_ot_set_modulation_level(int percent)
     unsigned int data = percent;
     unsigned long response = esp_ot_send_request(
         esp_ot_build_request(OT_WRITE_DATA, MSG_ID_MAX_REL_MOD_LEVEL_SETTING, data));
+    return esp_ot_is_valid_response(response);
+}
+
+bool esp_ot_set_otc_curve_ratio(int percent)
+{
+    unsigned int data = percent;
+    unsigned long response = esp_ot_send_request(
+        esp_ot_build_request(OT_WRITE_DATA, MSG_ID_OTC_CURVE_RATIO, data));
     return esp_ot_is_valid_response(response);
 }
 

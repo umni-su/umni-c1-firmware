@@ -48,7 +48,8 @@
 #define NVS_KEY_OT_TB_SETPOINT "ottbsp"   // отопление
 #define NVS_KEY_OT_COOL "otcol"           // охлаждение
 #define NVS_KEY_OT_MOD "otmod"            // установленный режим модуляции
-#define NVS_KEY_OT_OTC "ototc"            // наружний датчик температуры
+#define NVS_KEY_OT_OTC "ototc"            // наружний датчик температуры (вкл выкл темп. компенсация)
+#define NVS_KEY_OT_HCR "othcr"            // коэффициент кривой нагрева
 
 /**
  * Relays
