@@ -23,15 +23,11 @@
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 #include "../components/opentherm/opentherm_operations.h"
+#include "../components/rf433/rf433.h"
 
 static const char *TAG = "main";
 
 ESP_EVENT_DEFINE_BASE(APP_EVENTS);
-
-static i2c_dev_t pcf8574_inp;
-
-static TaskHandle_t do_handle;
-static TaskHandle_t di_handle;
 
 static bool webserver_started = false;
 static bool mqtt_connected = false;
@@ -45,6 +41,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         {
         case EV_SDCARD_MOUNTED:
             um_config_init();
+            um_rf_433_init();
             break;
         case EV_CONFIGURATION_READY:
             webserver_start();

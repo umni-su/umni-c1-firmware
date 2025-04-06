@@ -50,7 +50,8 @@ void um_config_create_dir_if_not_exists(char *path)
 
 esp_err_t um_config_init()
 {
-
+    um_config_create_dir_if_not_exists(CONFIG_PATH);
+    um_config_create_dir_if_not_exists(LOG_PATH);
     esp_err_t res = esp_read_mac(mac, ESP_MAC_EFUSE_FACTORY);
     if (res == ESP_OK)
     {
@@ -130,8 +131,6 @@ void um_config_create_config_file_sensors()
 {
     vTaskDelay(500 / portTICK_PERIOD_MS);
     bool has_content = false;
-    um_config_create_dir_if_not_exists(CONFIG_PATH);
-    um_config_create_dir_if_not_exists(LOG_PATH);
     char *content = um_config_get_config_file(CONFIG_FILE_SENSORS);
     if (content != NULL)
     {

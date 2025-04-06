@@ -167,3 +167,12 @@ um_netif_data_type_t um_systeminfo_get_eth_netif_config()
 {
     return eth_ip_info;
 }
+
+void um_systeminfo_uptime_to_string(char *str)
+{
+    int64_t uptime = data.uptime;
+
+    char decimal[64 + 1];
+
+    snprintf(str, sizeof(decimal), "%" PRId64, uptime);
+}

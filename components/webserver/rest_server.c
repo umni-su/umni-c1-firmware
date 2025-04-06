@@ -33,6 +33,7 @@
 #include "../adc/adc.h"
 #include "../ota/ota.h"
 #include "../mosquitto/mosquitto.h"
+#include "../rf433/rf433.h"
 #include "../mdns_service/mdns_service.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
@@ -216,10 +217,14 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     const um_systeminfo_data_type_t info = um_systeminfo_get_struct_data();
+
+    char uptime[64];
+    um_systeminfo_uptime_to_string(uptime);
+
     cJSON_AddStringToObject(root, "date", info.date);
     cJSON_AddStringToObject(root, "last_reset", info.last_reset);
     cJSON_AddNumberToObject(root, "reset_reason", (int)info.restart_reason);
-    cJSON_AddNumberToObject(root, "uptime", info.uptime);
+    cJSON_AddStringToObject(root, "uptime", uptime);
     cJSON_AddNumberToObject(root, "free_heap", info.free_heap);
     cJSON_AddNumberToObject(root, "total_heap", info.total_heap);
     cJSON_AddStringToObject(root, "fw_ver", info.fw_ver);
@@ -368,6 +373,17 @@ static esp_err_t adm_st_dio(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
     char *config = um_config_get_config_file_dio();
+    httpd_resp_sendstr(req, config);
+    free((void *)config);
+    return ESP_OK;
+}
+
+static esp_err_t adm_st_rf(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+
+    char *config = um_config_get_config_file(CONFIG_FILE_RF433);
+
     httpd_resp_sendstr(req, config);
     free((void *)config);
     return ESP_OK;
@@ -557,6 +573,8 @@ static esp_err_t system_info_post_handler(httpd_req_t *req)
 /** GET to settings configuration*/
 static esp_err_t adm_settings(httpd_req_t *req)
 {
+    httpd_resp_set_type(req, "application/json");
+
     cJSON *config = cJSON_CreateObject();
 
     char *dio_config = um_config_get_config_file_dio();
@@ -645,6 +663,8 @@ static esp_err_t adm_settings(httpd_req_t *req)
 /** POST save settings */
 static esp_err_t adm_settings_save(httpd_req_t *req)
 {
+    httpd_resp_set_type(req, "application/json");
+
     char *buff = prepare_post_buffer(req);
     cJSON *post = cJSON_Parse(buff);
 
@@ -778,6 +798,54 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
         }
     }
 
+    if (strcmp(type, "rf") == 0)
+    {
+        bool scan = cJSON_HasObjectItem(data, "scan") ? cJSON_IsTrue(cJSON_GetObjectItem(data, "scan")) : false;
+        cJSON *sensors = cJSON_GetObjectItem(data, "sensors");
+        if (sensors)
+        {
+            if (scan)
+            {
+                char *rf_config = um_config_get_config_file(CONFIG_FILE_RF433);
+                // if config exists, parse it
+                if (rf_config != NULL)
+                {
+                    cJSON *config_arr = cJSON_Parse(rf_config);
+                    cJSON *sensor_scan = NULL;
+                    cJSON *config_el = NULL;
+                    cJSON_ArrayForEach(sensor_scan, sensors)
+                    {
+                        bool founded = false;
+                        cJSON_ArrayForEach(config_el, config_arr)
+                        {
+                            int scan_serial = cJSON_GetObjectItem(sensor_scan, "serial")->valueint;
+                            int config_serial = cJSON_GetObjectItem(config_el, "serial")->valueint;
+                            if (scan_serial == config_serial)
+                            {
+                                founded = true;
+                                break;
+                            }
+                        }
+                        // add item to array if no duplicates
+                        if (!founded)
+                        {
+                            cJSON_AddItemToArray(config_arr, sensor_scan);
+                        }
+                    }
+                    success = um_config_write_config_file(CONFIG_FILE_RF433, config_arr);
+                    um_rf433_add_sensors_from_config();
+                    // cJSON_Delete(config_arr);
+                    //  free((void *)rf_config); <-- assert failed: tlsf_free tlsf.c:629 (!block_is_free(block) && "block already marked as free")
+                }
+            }
+            else
+            {
+                success = um_config_write_config_file(CONFIG_FILE_RF433, sensors);
+                um_rf433_add_sensors_from_config();
+            }
+        }
+    }
+
     cJSON_AddBoolToObject(res, "success", success);
 
     char *json = cJSON_PrintUnformatted(res);
@@ -838,8 +906,40 @@ esp_err_t adm_reset(httpd_req_t *req)
     do_set_all_ff();
     um_config_delete_config_file(CONFIG_FILE_SENSORS);
     um_config_delete_config_file(CONFIG_FILE_ONEWIRE);
+    um_config_delete_config_file(CONFIG_FILE_RF433);
     um_nvs_erase();
     esp_restart();
+    return ESP_OK;
+}
+
+/** RF 433 scan devices */
+esp_err_t adm_rf_scan(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+    um_rf433_activale_search(); // active search if not active
+    um_rf_devices_t *search = um_rf433_get_search_result();
+
+    cJSON *res = cJSON_CreateArray();
+
+    for (int i = 0; i < MAX_SEARCH_SENSORS; i++)
+    {
+        um_rf_devices_t device = search[i];
+        if (device.serial > 0)
+        {
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddNumberToObject(item, "serial", device.serial);
+            cJSON_AddNumberToObject(item, "state", device.state);
+            cJSON_AddBoolToObject(item, "alarm", device.alarm);
+
+            cJSON_AddItemToArray(res, item);
+        }
+    }
+
+    char *json = cJSON_PrintUnformatted(res);
+
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(res);
     return ESP_OK;
 }
 
@@ -937,6 +1037,14 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_ot_uri);
 
+    // RF433 get
+    httpd_uri_t adm_st_rf_uri = {
+        .uri = "/adm/st/rf",
+        .method = HTTP_GET,
+        .handler = adm_st_rf,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_rf_uri);
+
     httpd_uri_t adm_st_ot_reset_uri = {
         .uri = "/adm/st/ot/reset",
         .method = HTTP_POST,
@@ -983,6 +1091,14 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_reset,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_reset_uri);
+
+    // adm/reboot get
+    httpd_uri_t adm_rf_scan_uri = {
+        .uri = "/adm/rf/scan",
+        .method = HTTP_GET,
+        .handler = adm_rf_scan,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_rf_scan_uri);
 
     /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {

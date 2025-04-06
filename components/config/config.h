@@ -3,6 +3,7 @@
 #define LOG_PATH "/log"
 #define CONFIG_FILE_SENSORS "/dio.json"
 #define CONFIG_FILE_ONEWIRE "/ow.json"
+#define CONFIG_FILE_RF433 "/rf.json"
 
 esp_err_t um_config_init();
 

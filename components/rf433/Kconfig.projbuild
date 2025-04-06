@@ -1,0 +1,9 @@
+menu "UMNI RF433"
+            
+    config UMNI_RF433_REC_PIN
+        int "Пин приемника RF433"
+        default 25
+        help
+            Укажите пин приемника RF433.
+
+endmenu

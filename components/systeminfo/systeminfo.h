@@ -42,3 +42,5 @@ void um_systeminfo_init_sntp();
 um_netif_data_type_t um_systeminfo_get_eth_netif_config();
 
 um_systeminfo_data_type_t um_systeminfo_get_struct_data();
+
+void um_systeminfo_uptime_to_string(char *str);
