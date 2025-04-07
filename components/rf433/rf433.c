@@ -67,10 +67,9 @@ void um_rf433_receiver_task(void *pvParameter)
                 div = (rf_devices[existing_index].time - dev.time) / 1000;
 
                 dev.triggered = !dev.triggered && div > 200;
+                dev.state = state;
                 // ESP_LOGI(TAG, "%.1f : Existing serial number %06lX, time %ld", div, dev.serial, rf_devices[existing_index].time);
             }
-
-            dev.state = state;
 
             // show = (dev.triggered) || existing_index == -1;
             show = dev.triggered;
@@ -78,16 +77,16 @@ void um_rf433_receiver_task(void *pvParameter)
             {
                 ESP_LOGW(TAG, "Received %lu / %dbit Protocol: %d", all, esp_rf433_get_received_bit_length(), prot_num);
                 ESP_LOGI(TAG, "Serial number %06lX, time %ld, index %d", dev.serial, dev.time, existing_index);
-                ESP_LOGI(TAG, "A Chan 1: %d, ", chan1);
-                ESP_LOGI(TAG, "B Chan 2: %d, ", chan2);
-                ESP_LOGI(TAG, "C Chan 3: %d, ", chan3);
-                ESP_LOGI(TAG, "D Chan 4: %d \n", chan4);
+                ESP_LOGI(TAG, "State: %d, ", state);
+                ESP_LOGI(TAG, "A: %d, B: %d, C: %d, D: %d, \n", chan1, chan2, chan3, chan4);
 
                 int ind = um_rf433_get_existing_index(rf_devices, number, MAX_SENSORS);
 
+                rf_devices[ind].state = state;
+
                 if (rf_devices[ind].triggered)
                 {
-                    // rf_devices[ind].serial = 0;
+                    rf_devices[ind].state = state;
                     rf_devices[ind].time = 0;
                     rf_devices[ind].triggered = false;
                     ESP_LOGI(TAG, "Delete indexes");
@@ -158,6 +157,21 @@ void um_rf_433_init()
     esp_rf433_initialize(CONFIG_UMNI_RF433_REC_PIN, &um_rf433_receiver_task);
 }
 
+um_rf_devices_t um_rf433_get_sensor(int serial)
+{
+    int count = um_rf433_get_array_length(rf_devices, MAX_SENSORS);
+    um_rf_devices_t device;
+    for (int i = 0; i < count; i++)
+    {
+        if (rf_devices[i].serial == serial)
+        {
+            device = rf_devices[i];
+            break;
+        }
+    }
+    return device;
+}
+
 void um_rf433_add_sensors_from_config()
 {
     // обнуляем массив сенсоров
@@ -185,6 +199,8 @@ void um_rf433_add_sensors_from_config()
         }
         index++;
     }
+    free((void *)config);
+    cJSON_Delete(array);
 }
 
 void um_rf433_get_config_file()

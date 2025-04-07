@@ -30,3 +30,5 @@ void um_rf433_clear_search();
 um_rf_devices_t *um_rf433_get_search_result();
 
 void um_rf433_add_sensors_from_config();
+
+um_rf_devices_t um_rf433_get_sensor(int serial);

@@ -383,8 +383,25 @@ static esp_err_t adm_st_rf(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
 
     char *config = um_config_get_config_file(CONFIG_FILE_RF433);
+    cJSON *array = cJSON_Parse(config);
+
+    if (array != NULL && cJSON_IsArray(array))
+    {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, array)
+        {
+            int serial = cJSON_GetObjectItem(item, "serial")->valueint;
+            um_rf_devices_t device = um_rf433_get_sensor(serial);
+            if (device.serial == serial)
+            {
+                cJSON_SetNumberValue(cJSON_GetObjectItem(item, "state"), device.state);
+            }
+        }
+        config = cJSON_PrintUnformatted(array);
+    }
 
     httpd_resp_sendstr(req, config);
+    cJSON_Delete(array);
     free((void *)config);
     return ESP_OK;
 }
@@ -837,6 +854,7 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
                     // cJSON_Delete(config_arr);
                     //  free((void *)rf_config); <-- assert failed: tlsf_free tlsf.c:629 (!block_is_free(block) && "block already marked as free")
                 }
+                free((void *)rf_config);
             }
             else
             {
