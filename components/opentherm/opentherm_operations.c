@@ -47,7 +47,7 @@ void esp_ot_event_handler(void *handler_arg, esp_event_base_t base, int32_t id, 
     }
     enableCentralHeating = id == EV_OT_CH_ON ? true : false;
 
-    esp_err_t res = um_ot_set_boiler_status(
+    um_ot_set_boiler_status(
         enableCentralHeating,
         enableHotWater, enableCooling,
         enableOutsideTemperatureCompensation,

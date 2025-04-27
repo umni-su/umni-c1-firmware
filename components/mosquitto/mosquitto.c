@@ -65,6 +65,7 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
         id == EV_STATUS_CHANGED_DO ||
         id == EV_STATUS_CHANGED_NTC ||
         id == EV_STATUS_CHANGED_OW ||
+        id == EV_RF433_SENSOR ||
         id == EV_OT_SET_DATA)
     {
         cJSON *payload = cJSON_CreateObject();
@@ -86,7 +87,15 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
             cJSON_AddNumberToObject(payload, "channel", status_ntc->channel);
             cJSON_AddNumberToObject(payload, "temp", status_ntc->temp);
             break;
+        case EV_RF433_SENSOR:
+            topic = UM_TOPIC_STATUS_RF433;
+            um_ev_message_rf433 *status_rf = (um_ev_message_rf433 *)event_data;
 
+            cJSON_AddNumberToObject(payload, "serial", status_rf->serial);
+            cJSON_AddNumberToObject(payload, "state", status_rf->state);
+            cJSON_AddBoolToObject(payload, "alarm", status_rf->alarm);
+            cJSON_AddBoolToObject(payload, "triggered", status_rf->triggered);
+            break;
         case EV_STATUS_CHANGED_OW:
             topic = UM_TOPIC_STATUS_ONEWIRE;
             um_ev_message_onewire *status_onewire = (um_ev_message_onewire *)event_data;
@@ -401,10 +410,23 @@ esp_err_t um_mqtt_send_config()
     cJSON_Delete(json_config);
     free(config);
 
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
     config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
     json_config = cJSON_Parse(config);
     json_str = cJSON_PrintUnformatted(json_config);
     um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_OW, json_str);
+
+    free(json_str);
+    cJSON_Delete(json_config);
+    free(config);
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    config = um_config_get_config_file(CONFIG_FILE_RF433);
+    json_config = cJSON_Parse(config);
+    json_str = cJSON_PrintUnformatted(json_config);
+    um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_RF433, json_str);
 
     free(json_str);
     cJSON_Delete(json_config);

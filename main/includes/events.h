@@ -26,6 +26,14 @@ extern "C"
         float temp;
     } um_ev_message_onewire;
 
+    typedef struct
+    {
+        uint32_t serial;
+        uint8_t state;
+        bool alarm;
+        bool triggered;
+    } um_ev_message_rf433;
+
     // Declare an event base
     ESP_EVENT_DECLARE_BASE(APP_EVENTS); // declaration of the timer events family
 
@@ -57,7 +65,8 @@ extern "C"
         EV_OTA_ABORT,
         EV_OT_SET_DATA,
         EV_OT_CH_ON,
-        EV_OT_CH_OFF
+        EV_OT_CH_OFF,
+        EV_RF433_SENSOR
     };
 
 #ifdef __cplusplus

@@ -397,12 +397,13 @@ static esp_err_t adm_st_rf(httpd_req_t *req)
                 cJSON_SetNumberValue(cJSON_GetObjectItem(item, "state"), device.state);
             }
         }
+        free((void *)config); // free to prevent memory leak
         config = cJSON_PrintUnformatted(array);
     }
 
     httpd_resp_sendstr(req, config);
-    cJSON_Delete(array);
     free((void *)config);
+    cJSON_Delete(array);
     return ESP_OK;
 }
 
@@ -961,13 +962,6 @@ esp_err_t adm_rf_scan(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* Custom function to free context */
-void free_ctx_func(void *ctx)
-{
-    /* Could be something other than free */
-    free(ctx);
-}
-
 esp_err_t start_rest_server(const char *base_path)
 {
     um_mdns_prepare();
@@ -981,11 +975,11 @@ esp_err_t start_rest_server(const char *base_path)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.max_uri_handlers = 50;
-    config.lru_purge_enable = true;
+    // config.lru_purge_enable = true;
     config.max_open_sockets = MAX_CLIENTS + 2;
     //---config.global_user_ctx = keep_alive;
     //  config.open_fn = ws_open_fd;
-    //---config.close_fn = ws_close_fd;
+    // config.close_fn = on_close;
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);

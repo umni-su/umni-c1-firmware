@@ -13,9 +13,11 @@
 #define UM_TOPIC_CONFIGURATION "/cnf" // Device send configuration topic
 #define UM_TOPIC_CONFIGURATION_DIO "/cnf/dio"
 #define UM_TOPIC_CONFIGURATION_OW "/cnf/ow"
+#define UM_TOPIC_CONFIGURATION_RF433 "/cnf/rf"
 #define UM_TOPIC_STATUS "/st" // Device send status topic
 #define UM_TOPIC_STATUS_DIO "/dio"
 #define UM_TOPIC_STATUS_ONEWIRE "/ow"
+#define UM_TOPIC_STATUS_RF433 "/rf"
 #define UM_TOPIC_RELAY "/rel"       // Device send relay status topic
 #define UM_TOPIC_INPUT "/inp"       // Device send input status topic
 #define UM_TOPIC_NTC "/ntc"         // Device send ntc sensors values topic

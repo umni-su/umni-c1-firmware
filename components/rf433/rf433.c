@@ -8,8 +8,11 @@
 
 #include "rf433.h"
 #include "esp32_rf_receiver.h"
+#include "esp_event.h"
 
 #include "../config/config.h"
+
+#include "../../main/includes/events.h"
 
 static const char *TAG = "rf433";
 
@@ -84,13 +87,13 @@ void um_rf433_receiver_task(void *pvParameter)
 
                 rf_devices[ind].state = state;
 
-                if (rf_devices[ind].triggered)
-                {
-                    rf_devices[ind].state = state;
-                    rf_devices[ind].time = 0;
-                    rf_devices[ind].triggered = false;
-                    ESP_LOGI(TAG, "Delete indexes");
-                }
+                um_ev_message_rf433 message = {
+                    .alarm = rf_devices[ind].alarm,
+                    .serial = rf_devices[ind].serial,
+                    .state = rf_devices[ind].state,
+                    .triggered = rf_devices[ind].triggered};
+
+                esp_event_post(APP_EVENTS, EV_RF433_SENSOR, &message, sizeof(message), portMAX_DELAY);
             }
 
             if (search)
