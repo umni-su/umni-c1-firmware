@@ -488,19 +488,19 @@ void di_interrupt_task(void *arg)
                             do_set_level(channel_off, !pin_level);
                         }
                     }
+                }
 
-                    short int ch = automation_opentherm_config[i].ch;
-                    if (ch >= 0)
+                short int ch = automation_opentherm_config[i].ch;
+                if (ch >= 0)
+                {
+                    int ot_ch = automation_opentherm_config[i].ch;
+                    if (pin_level == 0)
                     {
-                        int ot_ch = automation_opentherm_config[i].ch;
-                        if (pin_level == 0)
-                        {
-                            ot_ch = ot_ch == 1 ? 0 : 1;
-                        }
-
-                        esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
-                        vTaskDelay(100 / portTICK_PERIOD_MS);
+                        ot_ch = ot_ch == 1 ? 0 : 1;
                     }
+                    ESP_LOGI("dio auto", "Set boiler state to %d", ot_ch);
+                    esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
+                    vTaskDelay(100 / portTICK_PERIOD_MS);
                 }
 
                 //}

@@ -16,12 +16,12 @@ endmenu
 menu "UMNI адаптер Opentherm"
     config UMNI_OT_OUT
         int "Выходной сигнал с линии Opentherm"
-        default 32
+        default 33
         help
             Выходной сигнал с линии Opentherm.
     config UMNI_OT_IN
         int "Входной сигнал с линии Opentherm"
-        default 33
+        default 32
         help
             Входной сигнал с линии Opentherm.
 endmenu
@@ -35,4 +35,15 @@ menu "UMNI SD card"
     config UMNI_SD_MOUNT_POINT
         string  "Точка монтирования SD карты"
         default "/sdcard"
+endmenu
+
+# Timings
+menu "UMNI Timeouts"
+    config UMNI_TASK_TIMEOUT_BASE
+        int "Базовый интервал выполнения задачи или задержки"
+        default 60000
+
+        config UMNI_TASK_TIMEOUT_LONG
+            int "Большой интервал выполнения задачи или задержки"
+            default 300000
 endmenu

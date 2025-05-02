@@ -964,7 +964,7 @@ esp_err_t adm_rf_scan(httpd_req_t *req)
 
 esp_err_t start_rest_server(const char *base_path)
 {
-    um_mdns_prepare();
+    // um_mdns_prepare();
     authenticated = false;
     installed = um_nvs_is_installed();
     REST_CHECK(base_path, "wrong base path", err);

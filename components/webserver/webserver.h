@@ -11,7 +11,7 @@
 #define SCRATCH_BUFSIZE (8192)
 #define CHECK_FILE_EXTENSION(filename, ext) (strcasecmp(&filename[strlen(filename) - strlen(ext)], ext) == 0)
 
-#define MDNS_INSTANCE "esp home web server"
+#define MDNS_INSTANCE "umni web server"
 
 esp_err_t start_rest_server(const char *base_path);
 

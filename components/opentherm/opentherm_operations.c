@@ -6,8 +6,8 @@
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 
-#define OT_IN_PIN 32
-#define OT_OUT_PIN 33
+#define OT_IN_PIN CONFIG_UMNI_OT_IN
+#define OT_OUT_PIN CONFIG_UMNI_OT_OUT
 #define ESP_INTR_FLAG_DEFAULT 0
 
 static int targetDHWTemp = 59;
@@ -35,7 +35,7 @@ bool initialized = false;
 unsigned long status;
 
 static unsigned char task_count = 0;
-static unsigned char task_count_max_to_send_data = 2;
+static unsigned char task_count_max_to_send_data = 120; // 120 sec delay counter to send mqtt message
 
 static bool need_read_pump = false;
 
@@ -45,14 +45,16 @@ void esp_ot_event_handler(void *handler_arg, esp_event_base_t base, int32_t id, 
     {
         return;
     }
-    enableCentralHeating = id == EV_OT_CH_ON ? true : false;
+    bool otch = id == EV_OT_CH_ON ? true : false;
 
-    um_ot_set_boiler_status(
-        enableCentralHeating,
-        enableHotWater, enableCooling,
-        enableOutsideTemperatureCompensation,
-        enableCentralHeating2);
-    ESP_LOGI(TAG, "OT CH triggered by event. OT is %s", enableCentralHeating ? "ON" : "OFF");
+    um_ot_update_state(otch, ot_data.otdhwsp, ot_data.ottbsp);
+
+    // um_ot_set_boiler_status(
+    //     enableCentralHeating,
+    //     enableHotWater, enableCooling,
+    //     enableOutsideTemperatureCompensation,
+    //     enableCentralHeating2);
+    ESP_LOGI(TAG, "OT CH triggered by event. OT is %s", otch ? "ON" : "OFF");
 }
 
 void esp_ot_control_task_handler(void *pvParameter)
