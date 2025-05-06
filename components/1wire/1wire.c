@@ -1,15 +1,16 @@
-#include "../../main/includes/events.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_event.h"
 #include "1wire.h"
+#include "../config/config.h"
+// #include "../automation/um_automation.h"
+#include "../../main/includes/events.h"
 
-// onewire_addr_t addrs[ONEWIRE_MAX_SENSORS];
-//  size_t sensor_count = 0;
 const char *ONE_WIRE_TAG = "onewire";
 const char *ONE_WIRE_TASK_TAG = "onewire-task";
 
 onewire_addr_t addresses[ONEWIRE_MAX_SENSORS] = {0};
+
 um_onewire_sensor_t sensors[ONEWIRE_MAX_SENSORS];
 
 TaskHandle_t onewire_task_handle = NULL;
@@ -44,6 +45,8 @@ void onewire_task(void *arg)
                             .sn = string_address,
                             .temp = temp};
                         esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
+
+                        um_onewire_update_state(addresses[i], temp);
                         //  free(buff);
                     }
                     break;
@@ -58,6 +61,18 @@ void onewire_task(void *arg)
     vTaskDelete(NULL);
 }
 
+void um_onewire_update_state(uint64_t address, float temp)
+{
+    for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++)
+    {
+        if (sensors[i].address != 0 && sensors[i].address == address)
+        {
+            sensors[i].value = temp;
+            break;
+        }
+    }
+}
+
 void onewire_configure()
 {
     ESP_LOGI(ONE_WIRE_TAG, "Starting one-wire bus with ONEWIRE_MAX_SENSORS = %d", ONEWIRE_MAX_SENSORS);
@@ -65,7 +80,7 @@ void onewire_configure()
     onewire_reset(ONE_WIRE_PIN);
     onewire_skip_rom(ONE_WIRE_PIN);
 
-    onewire_init_config();
+    um_onewire_init();
 }
 
 um_onewire_sensor_t *onewire_get_sensors()
@@ -73,7 +88,106 @@ um_onewire_sensor_t *onewire_get_sensors()
     return sensors;
 }
 
-void onewire_init_config()
+void um_onewire_prepare_config_file()
+{
+    bool has_content = false;
+    int size = ONEWIRE_MAX_SENSORS;
+
+    cJSON *root = cJSON_CreateArray();
+    cJSON *el = NULL;
+
+    char *content = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
+    if (content != NULL && strlen(content) > 10)
+    {
+        has_content = true;
+    }
+    if (has_content)
+    {
+        root = cJSON_Parse(content);
+        if (cJSON_IsInvalid(root))
+        {
+            has_content = false;
+            root = cJSON_CreateArray();
+        }
+    }
+
+    uint64_t checking_addr;
+
+    // Loop through sensors
+    for (int i = 0; i < size; i++)
+    {
+        if (sensors[i].address == 0)
+            continue;
+
+        // Compare sensor with config sensor
+        bool founded = false;
+        char string_addr[21];
+        sprintf(string_addr, "%08llx", sensors[i].address);
+        cJSON_ArrayForEach(el, root)
+        {
+            char *item_add_json = cJSON_GetObjectItem(el, "sn")->valuestring;
+            onewire_addr_str_to_uint64_t(item_add_json, &checking_addr);
+            if (checking_addr == sensors[i].address)
+            {
+                founded = true;
+                cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), founded);
+            }
+        }
+        if (founded)
+        {
+            ESP_LOGI(ONE_WIRE_TAG, "Sensor %08llx exists in configutation file, skipping", sensors[i].address);
+        }
+        else
+        {
+            ESP_LOGI(ONE_WIRE_TAG, "Sensor %08llx not found in configutation file, let`s add it", sensors[i].address);
+
+            cJSON *sensor = cJSON_CreateObject();
+            cJSON_AddStringToObject(sensor, "label", string_addr);
+            cJSON_AddStringToObject(sensor, "sn", string_addr);
+            cJSON_AddBoolToObject(sensor, "active", true);
+            cJSON_AddItemToArray(root, sensor);
+        }
+    }
+    el = NULL;
+    // Check INACTIVE sensors
+    cJSON_ArrayForEach(el, root) // now loop from all json to find innactive sensors
+    {
+        checking_addr = 0;
+        char *el_sn = cJSON_GetObjectItem(el, "sn")->valuestring;
+        onewire_addr_str_to_uint64_t(el_sn, &checking_addr);
+
+        bool exists = false;
+
+        for (int j = 0; j < ONEWIRE_MAX_SENSORS; j++)
+        {
+            if (sensors[j].address == 0)
+                continue;
+            if (checking_addr == sensors[j].address) // sensor found in all json config
+            {
+                exists = true;
+            }
+        }
+
+        if (!exists) // sensor not found, set inactive
+        {
+            ESP_LOGE(ONE_WIRE_TAG, "Set not founded sensor %08llx inactive (active:false)", checking_addr);
+        }
+        cJSON *active = cJSON_HasObjectItem(el, "active") ? cJSON_GetObjectItem(el, "active") : NULL;
+        if (active != NULL)
+        {
+            cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), exists);
+        }
+    }
+
+    um_config_write_config_file(CONFIG_FILE_ONEWIRE, root);
+    //  char *c = cJSON_PrintUnformatted(root);
+    //  ESP_LOGW("!!!!!!!!!", "%s", c);
+    cJSON_Delete(root);
+
+    free((void *)content);
+}
+
+void um_onewire_init()
 {
     // esp_err_t reading_status;
     onewire_search_t onewire_search;
@@ -120,6 +234,10 @@ void onewire_init_config()
     esp_event_post(APP_EVENTS, EV_ONEWIRE_INIT, NULL, sizeof(NULL), portMAX_DELAY);
 
     xTaskCreatePinnedToCore(onewire_task, "onewire_task", 4096, NULL, ONE_WIRE_TASK_PRIORITY, &onewire_task_handle, 1);
+
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+
+    um_onewire_prepare_config_file();
 }
 
 void onewire_addr_str_to_uint64_t(char *address, uint64_t *out)

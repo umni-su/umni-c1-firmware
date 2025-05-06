@@ -43,7 +43,7 @@ void um_mqtt_register_task(void *args)
         {
             um_mqtt_register_device();
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            um_mqtt_send_config();
+            // um_mqtt_send_config();
             vTaskDelay(REGISTER_TIMEOUT / portTICK_PERIOD_MS);
         }
     }
@@ -64,6 +64,7 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
         id == EV_STATUS_CHANGED_DI ||
         id == EV_STATUS_CHANGED_DO ||
         id == EV_STATUS_CHANGED_NTC ||
+        id == EV_STATUS_CHANGED_AI ||
         id == EV_STATUS_CHANGED_OW ||
         id == EV_RF433_SENSOR ||
         id == EV_OT_SET_DATA)
@@ -86,6 +87,13 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
             um_ev_message_ntc *status_ntc = (um_ev_message_ntc *)event_data;
             cJSON_AddNumberToObject(payload, "channel", status_ntc->channel);
             cJSON_AddNumberToObject(payload, "temp", status_ntc->temp);
+            break;
+        case EV_STATUS_CHANGED_AI:
+            topic = UM_TOPIC_AI;
+            um_ev_message_ai *status_ai = (um_ev_message_ai *)event_data;
+            cJSON_AddNumberToObject(payload, "channel", status_ai->channel);
+            cJSON_AddNumberToObject(payload, "value", status_ai->value);
+            cJSON_AddNumberToObject(payload, "voltage", status_ai->voltage);
             break;
         case EV_RF433_SENSOR:
             topic = UM_TOPIC_STATUS_RF433;
@@ -127,8 +135,6 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
             cJSON_AddNumberToObject(payload, "outside_temperature", data.outside_temperature);
             cJSON_AddBoolToObject(payload, "fault", data.is_fault);
             cJSON_AddNumberToObject(payload, "fault_code", data.fault_code);
-            // cJSON_AddNumberToObject(payload, "ntc1", get_ntc_data_channel_temp(CONFIG_UMNI_NTC_1));
-            // cJSON_AddNumberToObject(payload, "ntc2", get_ntc_data_channel_temp(CONFIG_UMNI_NTC_2));
 
             cJSON *cap_mod = cJSON_CreateObject();
             cJSON_AddNumberToObject(cap_mod, "kw", data.cap_mod.kw);
@@ -414,8 +420,11 @@ esp_err_t um_mqtt_send_config()
 
     config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
     json_config = cJSON_Parse(config);
-    json_str = cJSON_PrintUnformatted(json_config);
-    um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_OW, json_str);
+    if (!cJSON_IsInvalid(json_config))
+    {
+        json_str = cJSON_PrintUnformatted(json_config);
+        um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_OW, json_str);
+    }
 
     free(json_str);
     cJSON_Delete(json_config);

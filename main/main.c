@@ -42,6 +42,8 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case EV_SDCARD_MOUNTED:
             um_config_init();
             um_rf_433_init();
+            init_adc();
+            um_onewire_init();
             break;
         case EV_CONFIGURATION_READY:
             webserver_start();
@@ -49,6 +51,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             //  чтобы обеспечить необходимый уровень при включении
             ESP_ERROR_CHECK(init_do());
             ESP_ERROR_CHECK(init_di());
+
             break;
         case EV_NVS_OPENED:
             ethernet_start();
@@ -58,9 +61,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case EV_SYSTEM_INSTALLED:
             do_blink_led_stat_start_working();
             um_systeminfo_init();
-            onewire_init_config();
             um_ota_mark_valid();
-            init_adc();
             break;
 
         case EV_NTP_SYNC_SUCCESS:

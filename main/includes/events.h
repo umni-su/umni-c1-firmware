@@ -22,6 +22,13 @@ extern "C"
 
     typedef struct
     {
+        int channel;
+        int value;
+        int voltage;
+    } um_ev_message_ai;
+
+    typedef struct
+    {
         char *sn;
         float temp;
     } um_ev_message_onewire;
@@ -59,6 +66,7 @@ extern "C"
         EV_STATUS_CHANGED_DI,
         EV_STATUS_CHANGED_DO,
         EV_STATUS_CHANGED_NTC,
+        EV_STATUS_CHANGED_AI,
         EV_STATUS_CHANGED_OW,
         EV_OTA_START,
         EV_OTA_SUCCESS,

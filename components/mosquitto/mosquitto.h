@@ -21,6 +21,7 @@
 #define UM_TOPIC_RELAY "/rel"       // Device send relay status topic
 #define UM_TOPIC_INPUT "/inp"       // Device send input status topic
 #define UM_TOPIC_NTC "/ntc"         // Device send ntc sensors values topic
+#define UM_TOPIC_AI "/ai"           // Device send analog sensors data
 #define UM_TOPIC_OPENTHERM "/ot"    // Device send opentherm stztus topic
 #define UM_TOPIC_ANALOG_INPUT "/ai" // Device registration topic
 #define UM_TOPIC_NETWORK "/nw"      // Device registration topic

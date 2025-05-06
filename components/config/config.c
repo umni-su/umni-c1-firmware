@@ -12,7 +12,6 @@
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 #include "../dio/dio.h"
-#include "../1wire/1wire.h"
 #include "freertos/FreeRTOS.h"
 #include "esp_event.h"
 
@@ -108,7 +107,8 @@ bool um_config_write_config_file(char *config_name, cJSON *root)
         fclose(file);
         return false;
     }
-    fprintf(file, _content);
+    fwrite(_content, 1, strlen(_content), file);
+    // fprintf(file, _content);
     fclose(file);
     free((void *)_content);
     // cJSON_Delete(root);
@@ -189,8 +189,6 @@ void um_config_create_config_file_sensors()
         cJSON_Delete(root);
     }
 
-    um_config_update_onewire_config_file();
-
     esp_event_post(APP_EVENTS, EV_CONFIGURATION_READY, NULL, sizeof(NULL), portMAX_DELAY);
     vTaskDelete(NULL);
 }
@@ -269,104 +267,4 @@ char *um_config_get_config_file_dio()
     cJSON_Delete(root);
     free(config);
     return res;
-}
-
-void um_config_update_onewire_config_file()
-{
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    bool has_content = false;
-    cJSON *root = cJSON_CreateArray();
-    cJSON *el = NULL;
-    um_onewire_sensor_t *sensors = onewire_get_sensors();
-
-    char *content = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
-    if (content != NULL && strlen(content) > 10)
-    {
-        has_content = true;
-    }
-    if (has_content)
-    {
-        root = cJSON_Parse(content);
-        if (cJSON_IsInvalid(root))
-        {
-            has_content = false;
-            root = cJSON_CreateArray();
-        }
-    }
-
-    int size = ONEWIRE_MAX_SENSORS;
-    uint64_t checking_addr;
-
-    // Loop through sensors
-    for (int i = 0; i < size; i++)
-    {
-        if (sensors[i].address == 0)
-            continue;
-
-        // Compare sensor with config sensor
-        bool founded = false;
-        char string_addr[21];
-        sprintf(string_addr, "%08llx", sensors[i].address);
-        cJSON_ArrayForEach(el, root)
-        {
-            char *item_add_json = cJSON_GetObjectItem(el, "sn")->valuestring;
-            onewire_addr_str_to_uint64_t(item_add_json, &checking_addr);
-            if (checking_addr == sensors[i].address)
-            {
-                founded = true;
-                cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), founded);
-            }
-        }
-        if (founded)
-        {
-            ESP_LOGI(CONFIG_TAG, "Sensor %08llx exists in configutation file, skipping", sensors[i].address);
-        }
-        else
-        {
-            ESP_LOGI(CONFIG_TAG, "Sensor %08llx not found in configutation file, let`s add it", sensors[i].address);
-
-            cJSON *sensor = cJSON_CreateObject();
-            cJSON_AddStringToObject(sensor, "label", string_addr);
-            cJSON_AddStringToObject(sensor, "sn", string_addr);
-            cJSON_AddBoolToObject(sensor, "active", true);
-            cJSON_AddItemToArray(root, sensor);
-        }
-    }
-    el = NULL;
-    // Check INACTIVE sensors
-    cJSON_ArrayForEach(el, root) // now loop from all json to find innactive sensors
-    {
-        checking_addr = 0;
-        char *el_sn = cJSON_GetObjectItem(el, "sn")->valuestring;
-        onewire_addr_str_to_uint64_t(el_sn, &checking_addr);
-
-        bool exists = false;
-
-        for (int j = 0; j < ONEWIRE_MAX_SENSORS; j++)
-        {
-            if (sensors[j].address == 0)
-                continue;
-            if (checking_addr == sensors[j].address) // sensor found in all json config
-            {
-                exists = true;
-            }
-        }
-
-        if (!exists) // sensor not found, set inactive
-        {
-            ESP_LOGE(CONFIG_TAG, "Set not founded sensor %08llx inactive (active:false)", checking_addr);
-        }
-        cJSON *active = cJSON_HasObjectItem(el, "active") ? cJSON_GetObjectItem(el, "active") : NULL;
-        if (active != NULL)
-        {
-            cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), exists);
-        }
-    }
-
-    um_config_write_config_file(CONFIG_FILE_ONEWIRE, root);
-    // char *c = cJSON_PrintUnformatted(root);
-    // ESP_LOGW("!!!!!!!!!", "%s", c);
-    cJSON_Delete(root);
-
-    free((void *)content);
 }

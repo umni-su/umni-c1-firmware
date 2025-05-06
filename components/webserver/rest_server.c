@@ -32,8 +32,10 @@
 #include "../dio/dio.h"
 #include "../adc/adc.h"
 #include "../ota/ota.h"
+#include "../1wire/1wire.h"
 #include "../mosquitto/mosquitto.h"
 #include "../rf433/rf433.h"
+#include "../adc/adc.h"
 #include "../mdns_service/mdns_service.h"
 
 #define MAX_CLIENTS CONFIG_UMNI_WEB_MAX_CLIENTS
@@ -340,6 +342,8 @@ static esp_err_t adm_auth_login(httpd_req_t *req)
     }
     cJSON_AddBoolToObject(response, "installed", installed);
     cJSON_AddBoolToObject(response, "success", success);
+    cJSON_AddStringToObject(response, "hostname", um_nvs_read_str(NVS_KEY_HOSTNAME));
+    cJSON_AddStringToObject(response, "macname", um_nvs_read_str(NVS_KEY_MACNAME));
 
     const char *json = cJSON_Print(response);
 
@@ -375,6 +379,110 @@ static esp_err_t adm_st_dio(httpd_req_t *req)
     char *config = um_config_get_config_file_dio();
     httpd_resp_sendstr(req, config);
     free((void *)config);
+    return ESP_OK;
+}
+
+static esp_err_t adm_st_ai(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+
+    char *config = um_config_get_config_file(CONFIG_FILE_AI);
+    cJSON *obj = cJSON_Parse(config);
+
+    if (obj != NULL && cJSON_IsObject(obj))
+    {
+        cJSON *ntc1 = cJSON_GetObjectItem(obj, "ntc1");
+        cJSON *ntc2 = cJSON_GetObjectItem(obj, "ntc2");
+        cJSON *ai1 = cJSON_GetObjectItem(obj, "ai1");
+        cJSON *ai2 = cJSON_GetObjectItem(obj, "ai2");
+
+        um_adc_config_t *conf = NULL;
+
+        if (ntc1 != NULL)
+        {
+            conf = um_adc_get_config_config_item(AN_NTC_1);
+            cJSON_AddNumberToObject(ntc1, "value", conf->value);
+            cJSON_AddBoolToObject(ntc1, "en", conf->en);
+            conf = NULL;
+        }
+
+        if (ntc2 != NULL)
+        {
+            conf = um_adc_get_config_config_item(AN_NTC_2);
+            cJSON_AddNumberToObject(ntc2, "value", conf->value);
+            cJSON_AddBoolToObject(ntc2, "en", conf->en);
+            conf = NULL;
+        }
+
+        if (ai1 != NULL)
+        {
+            conf = um_adc_get_config_config_item(AN_INP_1);
+            cJSON_AddNumberToObject(ai1, "value", (int)conf->value);
+            cJSON_AddBoolToObject(ai1, "en", conf->en);
+            cJSON_AddNumberToObject(ai1, "voltage", (int)conf->voltage);
+            conf = NULL;
+        }
+
+        if (ai2 != NULL)
+        {
+            conf = um_adc_get_config_config_item(AN_INP_2);
+            cJSON_AddNumberToObject(ai2, "value", (int)conf->value);
+            cJSON_AddBoolToObject(ai2, "en", conf->en);
+            cJSON_AddNumberToObject(ai2, "voltage", (int)conf->voltage);
+            conf = NULL;
+        }
+    }
+
+    free((void *)config); // free to prevent memory leak
+    config = cJSON_PrintUnformatted(obj);
+
+    httpd_resp_sendstr(req, config);
+    free((void *)config);
+    cJSON_Delete(obj);
+    return ESP_OK;
+}
+
+/**
+ * Get 1-wire state handler
+ *
+ * @return  esp_err_t[return description]
+ */
+static esp_err_t adm_st_ow(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/json");
+
+    char string_address[18] = {0};
+
+    int size = ONEWIRE_MAX_SENSORS;
+    um_onewire_sensor_t *sensors = onewire_get_sensors();
+
+    char *config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
+    cJSON *array = cJSON_Parse(config);
+    if (array != NULL && cJSON_IsArray(array))
+    {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, array)
+        {
+            cJSON *sn = cJSON_GetObjectItem(item, "sn");
+            if (sn == NULL)
+                continue;
+
+            for (int i = 0; i < size; i++)
+            {
+                onewire_uint64_t_to_addr_str(sensors[i].address, string_address);
+                if (sensors[i].address != 0 && strcmp(string_address, sn->valuestring) == 0)
+                {
+                    cJSON_AddNumberToObject(item, "temp", sensors[i].value);
+                    continue;
+                }
+            }
+        }
+    }
+    free((void *)config);
+    config = cJSON_PrintUnformatted(array);
+    httpd_resp_sendstr(req, config);
+    free((void *)config);
+    cJSON_Delete(array);
     return ESP_OK;
 }
 
@@ -597,6 +705,7 @@ static esp_err_t adm_settings(httpd_req_t *req)
 
     char *dio_config = um_config_get_config_file_dio();
     char *one_wire_config = um_config_get_config_file(CONFIG_FILE_ONEWIRE);
+    char *ai_config = um_config_get_config_file(CONFIG_FILE_AI);
 
     char *name = um_nvs_read_str(NVS_KEY_HOSTNAME);
     char *adm = um_nvs_read_str(NVS_KEY_USERNAME);
@@ -666,6 +775,12 @@ static esp_err_t adm_settings(httpd_req_t *req)
     {
         cJSON *ow = cJSON_Parse(one_wire_config);
         cJSON_AddItemToObject(config, "ow", ow);
+    }
+
+    if (ai_config != NULL)
+    {
+        cJSON *ai = cJSON_Parse(ai_config);
+        cJSON_AddItemToObject(config, "ai", ai);
     }
 
     char *res = cJSON_PrintUnformatted(config);
@@ -770,6 +885,29 @@ static esp_err_t adm_settings_save(httpd_req_t *req)
         if (cJSON_HasObjectItem(data, "do") && cJSON_HasObjectItem(data, "di"))
         {
             success = um_config_write_config_file(CONFIG_FILE_SENSORS, data);
+        }
+        else
+        {
+            success = false;
+        }
+    }
+
+    if (strcmp(type, "1wire") == 0)
+    {
+        success = um_config_write_config_file(CONFIG_FILE_ONEWIRE, data);
+        // You must restart your device to take effect
+    }
+
+    if (strcmp(type, "ai") == 0)
+    {
+        if (
+            cJSON_HasObjectItem(data, "ntc1") &&
+            cJSON_HasObjectItem(data, "ntc2") &&
+            cJSON_HasObjectItem(data, "ai1") &&
+            cJSON_HasObjectItem(data, "ai2"))
+        {
+            success = um_config_write_config_file(CONFIG_FILE_AI, data);
+            um_adc_add_sensors_from_config();
         }
         else
         {
@@ -1056,6 +1194,22 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = adm_st_rf,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &adm_st_rf_uri);
+
+    // AI get
+    httpd_uri_t adm_st_ai_uri = {
+        .uri = "/adm/st/ai",
+        .method = HTTP_GET,
+        .handler = adm_st_ai,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_ai_uri);
+
+    // ONEWIRE get
+    httpd_uri_t adm_st_ow_uri = {
+        .uri = "/adm/st/ow",
+        .method = HTTP_GET,
+        .handler = adm_st_ow,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &adm_st_ow_uri);
 
     httpd_uri_t adm_st_ot_reset_uri = {
         .uri = "/adm/st/ot/reset",

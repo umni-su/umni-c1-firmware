@@ -29,6 +29,8 @@ di_automation_relay_config_t automation_relay_config[6];
 
 di_automation_opentherm_config_t automation_opentherm_config[6];
 
+// um_am_main_t input_ports_automations[6];
+
 uint8_t do_get_nvs_state()
 {
     int8_t state = um_nvs_read_i8(NVS_KEY_RELAYS);
@@ -67,6 +69,7 @@ esp_err_t init_do()
         automation_opentherm_config[i].ch = -1;
     }
     char *config_file = um_config_get_config_file_dio();
+
     cJSON *config = cJSON_Parse(config_file);
     if (cJSON_HasObjectItem(config, "di"))
     {
@@ -78,9 +81,12 @@ esp_err_t init_do()
             int port = cJSON_HasObjectItem(di_el, "index") ? cJSON_GetObjectItem(di_el, "index")->valueint : -1;
             if (port >= 0)
             {
+                // TEST AUTOMATIONS HERE
+                // um_am_parse_json_config(di_el, &input_ports_automations[port]);
+                // TEST AUTOMATIONS HERE
                 bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
 
-                // ARRAY OF OPTTIONS
+                // ARRAY OF OPTIONS
                 cJSON *options = cJSON_HasObjectItem(di_el, "opt") ? cJSON_GetObjectItem(di_el, "opt") : NULL;
 
                 if (options != NULL)
