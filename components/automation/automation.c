@@ -1,5 +1,5 @@
-
-#include "um_automation.h"
+#include "esp_log.h"
+#include "automation.h"
 /**
  * All configuration of automation must have the same structure
  *
@@ -41,6 +41,7 @@ void um_am_test()
  */
 void um_am_parse_json_config(cJSON *sensor_json, um_am_main_t *config)
 {
+  // ESP_LOGW("um_am_parse_json_config", "%s", cJSON_Print(sensor_json));
   for (int j = 0; j < 6; j++)
   {
     config->opts.relay_action.off[j] = -1;
@@ -49,22 +50,23 @@ void um_am_parse_json_config(cJSON *sensor_json, um_am_main_t *config)
   config->opts.boiler_action.ch = -1;
   // json foreach
   const cJSON *ext = cJSON_GetObjectItem(sensor_json, "ext");
-  if (ext != NULL)
+  const cJSON *opt = cJSON_GetObjectItem(sensor_json, "opt");
+  if (ext != NULL && opt != NULL)
   {
     config->ext = cJSON_IsTrue(ext);
     // Parse trigger
-    cJSON *trigger = cJSON_GetObjectItem(sensor_json, "trigger");
+    cJSON *trigger = cJSON_GetObjectItem(opt, "trigger");
     if (trigger != NULL)
     {
       /** ============= TRIGGER ========================== **/
       cJSON *cond = cJSON_GetObjectItem(trigger, "cond");
       cJSON *value = cJSON_GetObjectItem(trigger, "value");
-      config->trigger.cond = (um_am_trigger_type_t)cond->valuestring;
+      config->trigger.cond = (um_am_trigger_type_t)cond->valueint;
       config->trigger.value = value->valuedouble;
       /** ============= TRIGGER ========================== **/
 
       // If trigger ok, parse actions
-      cJSON *actions = cJSON_GetObjectItem(sensor_json, "actions");
+      cJSON *actions = cJSON_GetObjectItem(opt, "actions");
       if (actions != NULL && cJSON_IsArray(actions))
       {
         cJSON *action = NULL;
@@ -83,7 +85,8 @@ void um_am_parse_json_config(cJSON *sensor_json, um_am_main_t *config)
             {
               cJSON_ArrayForEach(relay_index, on)
               {
-                config->opts.relay_action.on[i] = on->valueint;
+
+                config->opts.relay_action.on[relay_index->valueint] = relay_index->valueint;
                 i++;
               }
             }
@@ -95,7 +98,7 @@ void um_am_parse_json_config(cJSON *sensor_json, um_am_main_t *config)
             {
               cJSON_ArrayForEach(relay_index, off)
               {
-                config->opts.relay_action.off[i] = off->valueint;
+                config->opts.relay_action.off[relay_index->valueint] = relay_index->valueint;
                 i++;
               }
             }

@@ -43,7 +43,7 @@ void um_mqtt_register_task(void *args)
         {
             um_mqtt_register_device();
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            // um_mqtt_send_config();
+            um_mqtt_send_config();
             vTaskDelay(REGISTER_TIMEOUT / portTICK_PERIOD_MS);
         }
     }

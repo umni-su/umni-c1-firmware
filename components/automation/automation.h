@@ -7,10 +7,10 @@
 void um_am_test();
 typedef enum
 {
-    ALWAYS = 'a',
-    EQUAL = '=',
-    LESS = '<',
-    MORE = '>'
+    UM_AM_TRIG_ALWAYS = 1,
+    UM_AM_TRIG_EQUAL = 2,
+    UM_AM_TRIG_MORE = 3,
+    UM_AM_TRIG_LESS = 4,
 } um_am_trigger_type_t;
 
 typedef struct
@@ -51,6 +51,7 @@ typedef struct
 typedef struct
 {
     bool ext;
+    bool inverted;
     um_am_trigger_t trigger;
     um_am_options_t opts;
 

@@ -6,7 +6,7 @@
 #include "onewire.h"
 #include "ds18x20.h"
 
-#define ONEWIRE_TASK_TIMEOUT CONFIG_UMNI_TASK_TIMEOUT_BASE
+#define ONEWIRE_TASK_TIMEOUT 10000
 #define ONE_WIRE_PIN CONFIG_UMNI_ONEWIRE_PIN // hc32esp default 1wire pin
 #define ONE_WIRE "onewire"
 #define ONEWIRE_MAX_SENSORS 10 // max sensors on bus

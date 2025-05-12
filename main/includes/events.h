@@ -74,7 +74,8 @@ extern "C"
         EV_OT_SET_DATA,
         EV_OT_CH_ON,
         EV_OT_CH_OFF,
-        EV_RF433_SENSOR
+        EV_RF433_SENSOR,
+        EV_AUTOMATION_FIRED
     };
 
 #ifdef __cplusplus

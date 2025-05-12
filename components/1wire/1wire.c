@@ -3,17 +3,22 @@
 #include "esp_event.h"
 #include "1wire.h"
 #include "../config/config.h"
-// #include "../automation/um_automation.h"
+#include "../automation/automation.h"
 #include "../../main/includes/events.h"
 
 const char *ONE_WIRE_TAG = "onewire";
 const char *ONE_WIRE_TASK_TAG = "onewire-task";
+
+um_am_main_t automations[ONEWIRE_MAX_SENSORS];
 
 onewire_addr_t addresses[ONEWIRE_MAX_SENSORS] = {0};
 
 um_onewire_sensor_t sensors[ONEWIRE_MAX_SENSORS];
 
 TaskHandle_t onewire_task_handle = NULL;
+
+static unsigned short int total_loops = 6;
+static unsigned short int loop_count = 0;
 
 void onewire_task(void *arg)
 {
@@ -41,10 +46,15 @@ void onewire_task(void *arg)
                     if (res == ESP_OK)
                     {
                         ESP_LOGI(ONE_WIRE_TASK_TAG, "[%s]: temp is: %.2f°C, family_id: %d", string_address, temp, family_id);
-                        um_ev_message_onewire message = {
-                            .sn = string_address,
-                            .temp = temp};
-                        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
+                        // Send notification 10sec*6times = every 60sec
+                        if (loop_count >= total_loops)
+                        {
+                            um_ev_message_onewire message = {
+                                .sn = string_address,
+                                .temp = temp};
+                            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
+                            loop_count = 0;
+                        }
 
                         um_onewire_update_state(addresses[i], temp);
                         //  free(buff);
@@ -54,6 +64,10 @@ void onewire_task(void *arg)
                 default:
                     break;
                 }
+            }
+            if (loop_count < total_loops)
+            {
+                loop_count++;
             }
         }
         vTaskDelay(ONEWIRE_TASK_TIMEOUT / portTICK_PERIOD_MS);
@@ -68,6 +82,49 @@ void um_onewire_update_state(uint64_t address, float temp)
         if (sensors[i].address != 0 && sensors[i].address == address)
         {
             sensors[i].value = temp;
+            if (automations[i].ext)
+            {
+                // Compare values
+                bool conditionMatch = false;
+                switch (automations[i].trigger.cond)
+                {
+                case UM_AM_TRIG_EQUAL:
+                    conditionMatch = temp == automations[i].trigger.value;
+                    break;
+                case UM_AM_TRIG_MORE:
+                    conditionMatch = temp > automations[i].trigger.value;
+                    break;
+                case UM_AM_TRIG_LESS:
+                    conditionMatch = temp < automations[i].trigger.value;
+                    break;
+                default:
+                    // ,????проблема, не получится инвертровать состояние в событии
+                    conditionMatch = automations[i].inverted;
+                    break;
+                }
+                automations[i].inverted = conditionMatch;
+                um_am_main_t automation = automations[i];
+
+                // Fire automation
+                // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION START ====================");
+                ESP_LOGW("FIRE_AUTOMATION", "Fire for i:%d, sn:%08llx, temp: %0.1f", i, sensors[i].address, temp);
+                // for (int i = 0; i < 6; i++)
+                // {
+                //     if (automation.opts.relay_action.on[i] != -1)
+                //     {
+                //         ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, !automation.inverted ? "ON" : "OFF");
+                //     }
+                // }
+                // for (int i = 0; i < 6; i++)
+                // {
+                //     if (automation.opts.relay_action.off[i] != -1)
+                //     {
+                //         ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, automation.inverted ? "ON" : "OFF");
+                //     }
+                // }
+                // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION END ====================");
+                esp_event_post(APP_EVENTS, EV_AUTOMATION_FIRED, (void *)&automation, sizeof(um_am_main_t), portMAX_DELAY);
+            }
             break;
         }
     }
@@ -131,6 +188,8 @@ void um_onewire_prepare_config_file()
             {
                 founded = true;
                 cJSON_SetBoolValue(cJSON_GetObjectItem(el, "active"), founded);
+                // If this is existing sensor, fill automations
+                um_am_parse_json_config(el, &automations[i]);
             }
         }
         if (founded)
