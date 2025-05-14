@@ -40,6 +40,8 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         // ESP_LOGI(TAG, "EVENT IS %08lX, %d", id, (int)id);
         switch (id)
         {
+        case EV_DO_INIT:
+            break;
         case EV_SDCARD_MOUNTED:
             um_config_init();
             um_rf_433_init();
@@ -67,7 +69,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
 
         case EV_NTP_SYNC_SUCCESS:
             ESP_LOGI(TAG, "SNTP syncronization success!");
-            ESP_LOGI(TAG, "The current date/time in Moscow is: %s", (char *)event_data);
+            ESP_LOGI(TAG, "The current date/time is: %s", (char *)event_data);
             break;
 
         case EV_ETH_MAC:

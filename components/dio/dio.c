@@ -28,6 +28,8 @@ static uint8_t current_state;
 /** DI Automation action configuration */
 static um_am_main_t di_automation[6];
 
+static bool dio_initialized = false;
+
 uint8_t do_get_nvs_state()
 {
     int8_t state = um_nvs_read_i8(NVS_KEY_RELAYS);
@@ -95,6 +97,8 @@ esp_err_t init_do()
         // esp_log_set_default_level();
 
         esp_event_post(APP_EVENTS, EV_DO_INIT, NULL, sizeof(NULL), portMAX_DELAY);
+
+        dio_initialized = true;
     }
     else
     {
@@ -158,6 +162,8 @@ do_port_index_t di_map_channel(int channel)
 
 do_level_t do_get_level(do_port_index_t channel)
 {
+    if (!dio_initialized)
+        return 0;
     // channel = do_map_channel(channel);
     esp_err_t res = pcf8574_port_read(&pcf8574_output_dev_t, &output_data);
     if (res == ESP_OK)
@@ -174,6 +180,8 @@ do_level_t do_get_level(do_port_index_t channel)
 
 esp_err_t do_set_level(do_port_index_t channel, do_level_t level)
 {
+    if (!dio_initialized)
+        return ESP_FAIL;
     // channel = do_map_channel(channel);
     if (level == DO_LOW)
     {

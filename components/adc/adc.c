@@ -11,21 +11,20 @@
 #include "ntc_driver.h"
 #include "../config/config.h"
 #include "../../main/includes/events.h"
-
+#include "../automation/automation.h"
 #include "adc.h"
 
-const char *ADC_TAG = "adc";
-const char *ADC_TASK_TAG = "adc-task";
+static const char *ADC_TAG = "adc";
 
-TaskHandle_t adc_task_handle = NULL;
-adc_oneshot_unit_handle_t adc_handle = NULL;
-ntc_device_handle_t ntc_chan_1_handle = NULL;
-ntc_device_handle_t ntc_chan_2_handle = NULL;
+static TaskHandle_t adc_task_handle = NULL;
+static adc_oneshot_unit_handle_t adc_handle = NULL;
+static ntc_device_handle_t ntc_chan_1_handle = NULL;
+static ntc_device_handle_t ntc_chan_2_handle = NULL;
 
 float ntc_data[TOTAL_NTC_CHANNELS] = {0.0};
 
-adc_cali_handle_t adc_cali_ai1_handle = NULL;
-adc_cali_handle_t adc_cali_ai2_handle = NULL;
+static adc_cali_handle_t adc_cali_ai1_handle = NULL;
+static adc_cali_handle_t adc_cali_ai2_handle = NULL;
 static int adc_raw[2][10];
 static int voltage[2][10];
 
@@ -35,11 +34,13 @@ static bool do_calibration1_chan1 = false;
 static short int ai_loop_count = 0;
 static short int ntc_loop_count = 0;
 
-adc_oneshot_unit_init_cfg_t init_config = {
+static adc_oneshot_unit_init_cfg_t init_config = {
     .unit_id = ADC_UNIT_1,
 };
 
-static um_adc_config_t adc_config[4];
+static um_adc_config_t adc_config[TOTAL_ANALOG_CHANNELS];
+
+static um_am_main_t ai_automations[TOTAL_ANALOG_CHANNELS];
 
 float get_ntc_data_channel_temp(adc_channel_t channel)
 {
@@ -303,6 +304,9 @@ bool um_adc_update_values(analog_inputs_t chan, float value, int voltage)
             adc_config[i].value = value;
             adc_config[i].voltage = voltage;
 
+            ai_automations[i].value = value;
+            um_am_automation_run(&ai_automations[i]);
+
             return true;
         }
     }
@@ -344,6 +348,8 @@ void um_adc_add_sensors_from_config()
                 adc_config[index].value = adc_raw[0][1];
                 adc_config[index].voltage = voltage[0][1];
             }
+
+            um_am_parse_json_config(el, &ai_automations[index]);
         }
         index++;
     }

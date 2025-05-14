@@ -225,20 +225,22 @@ bool um_am_automation_has_matrix(um_am_main_t *config)
 
 void um_am_automation_run(um_am_main_t *config)
 {
+  if (!config->ext)
+    return;
   bool conditionMatch = false;
   switch (config->trigger.cond)
   {
   case UM_AM_TRIG_EQUAL:
     conditionMatch = config->value == config->trigger.value;
-    config->inverted = conditionMatch;
+    config->inverted = !conditionMatch;
     break;
   case UM_AM_TRIG_MORE:
     conditionMatch = config->value > config->trigger.value;
-    config->inverted = conditionMatch;
+    config->inverted = !conditionMatch;
     break;
   case UM_AM_TRIG_LESS:
     conditionMatch = config->value < config->trigger.value;
-    config->inverted = conditionMatch;
+    config->inverted = !conditionMatch;
     break;
   default:
     // ????проблема, не получится инвертровать состояние в событии
@@ -251,6 +253,7 @@ void um_am_automation_run(um_am_main_t *config)
   {
     esp_event_post(APP_EVENTS, config->opts.boiler_action.ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
   }
+
   // Реле
   if (um_am_automation_has_relays(config))
   {
@@ -263,10 +266,14 @@ void um_am_automation_run(um_am_main_t *config)
         int real_channel;
         state = !config->inverted ? DO_HIGH : DO_LOW;
         // real_channel = do_map_channel(config->opts.relay_action.on[i]);
-        real_channel = config->opts.relay_action.on[i];
+        real_channel = (int)config->opts.relay_action.on[i];
+
         prev_level = do_get_level(real_channel);
+
         if (prev_level != state)
         {
+          // printf("\r\nOK %d, ext %d, inv %d, st %d\r\n", real_channel, config->ext, config->inverted, state);
+          // return;
           do_set_level(real_channel, state); // state NOT invert, case ON[]
           ESP_LOGW("automations", "\r\n[NORMAL] Trigger: %d, value: %0.1f, inv:%d", (char)config->trigger.cond, config->trigger.value, config->inverted);
           for (int i = 0; i < 6; i++)
