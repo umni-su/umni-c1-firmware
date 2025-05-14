@@ -11,7 +11,7 @@
 #include "esp_event.h"
 
 #include "../config/config.h"
-
+#include "../automation/automation.h"
 #include "../../main/includes/events.h"
 
 static const char *TAG = "rf433";
@@ -21,6 +21,8 @@ static um_rf_devices_t rf_devices[MAX_SENSORS];
 static um_rf_devices_t rf_scanned_devices[MAX_SEARCH_SENSORS];
 
 static QueueHandle_t esp_rf433_queue = NULL;
+
+static um_am_main_t rf_automations[MAX_SENSORS];
 
 static bool search = false;
 
@@ -42,8 +44,9 @@ void um_rf433_receiver_task(void *pvParameter)
             int chan2 = all >> 2 & 0x01;
             int chan1 = all >> 3 & 0x01;
 
-            uint8_t state = (uint8_t)all;
-
+            // uint8_t state = (uint8_t)all;
+            uint8_t state = 0x00;
+            state |= (chan1 << 0) | (chan2 << 1) | (chan3 << 2) | (chan4 << 3);
             // uint32_t number = data && 0XFF;
             uint32_t number = all >> 4;
 
@@ -94,6 +97,12 @@ void um_rf433_receiver_task(void *pvParameter)
                     .triggered = rf_devices[ind].triggered};
 
                 esp_event_post(APP_EVENTS, EV_RF433_SENSOR, &message, sizeof(message), portMAX_DELAY);
+                if (rf_automations[ind].ext)
+                {
+                    rf_automations[ind].value = state;
+                    um_am_automation_run(&rf_automations[ind]);
+                }
+                // esp_event_post(APP_EVENTS, EV_AUTOMATION_FIRED, (void *)&rf_automations[ind], sizeof(um_am_main_t), portMAX_DELAY);
             }
 
             if (search)
@@ -199,6 +208,8 @@ void um_rf433_add_sensors_from_config()
             rf_devices[index].serial = cJSON_GetObjectItem(el, "serial")->valueint;
             rf_devices[index].alarm = cJSON_IsTrue(cJSON_GetObjectItem(el, "alarm"));
             rf_devices[index].state = cJSON_HasObjectItem(el, "state") ? cJSON_GetObjectItem(el, "state")->valueint : 0;
+
+            um_am_parse_json_config(el, &rf_automations[index]);
         }
         index++;
     }

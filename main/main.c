@@ -20,7 +20,7 @@
 #include "../components/config/config.h"
 #include "../components/mosquitto/mosquitto.h"
 #include "../components/ota/ota.h"
-#include "../components/automation/automation.h"
+// #include "../components/automation/automation.h"
 #include <esp_vfs_fat.h>
 #include <sdmmc_cmd.h>
 #include "../components/opentherm/opentherm_operations.h"
@@ -110,67 +110,67 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
         case EV_OTA_ABORT:
             do_blink_led_stat_start_working();
             break;
-        case EV_AUTOMATION_FIRED:
-            um_am_main_t *automation = (um_am_main_t *)event_data;
-            // int *on = automation->opts.relay_action.on;
-            // int *off = automation->opts.relay_action.off;
-            int on[6];
-            int off[6];
-            for (int i = 0; i < 6; i++)
-            {
-                on[i] = automation->opts.relay_action.on[i];
-                off[i] = automation->opts.relay_action.off[i];
-            }
-            // DO
-            for (int i = 0; i < 6; i++)
-            {
-                unsigned short int state;
-                int prev_level;
-                int real_channel;
+        // case EV_AUTOMATION_FIRED:
+        //     um_am_main_t *automation = (um_am_main_t *)event_data;
+        //     // int *on = automation->opts.relay_action.on;
+        //     // int *off = automation->opts.relay_action.off;
+        //     int on[6];
+        //     int off[6];
+        //     for (int i = 0; i < 6; i++)
+        //     {
+        //         on[i] = automation->opts.relay_action.on[i];
+        //         off[i] = automation->opts.relay_action.off[i];
+        //     }
+        //     // DO
+        //     for (int i = 0; i < 6; i++)
+        //     {
+        //         unsigned short int state;
+        //         int prev_level;
+        //         int real_channel;
 
-                if (on[i] != -1)
-                {
-                    state = automation->inverted ? DO_HIGH : DO_LOW;
-                    real_channel = do_map_channel(on[i]);
-                    prev_level = do_get_level(real_channel);
-                    // TODO PREV STATE and not switch case eq
-                    // on[i] === channel index
-                    if (prev_level != state)
-                    {
-                        do_set_level(real_channel, state); // state NOT invert, case ON[]
-                        ESP_LOGW("automations", "\r\n[NORMAL]Trigger: %d, value: %0.1f, inv:%d", (char)automation->trigger.cond, automation->trigger.value, automation->inverted);
-                        for (int i = 0; i < 6; i++)
-                        {
-                            if (automation->opts.relay_action.on[i] != -1)
-                            {
-                                ESP_LOGW("FIRE_AUTOMATION", "[OFF]Toggle relay i:%d state %s", i, state ? "ON" : "OFF");
-                            }
-                        }
-                        ESP_LOGW("automations", "Boiler: %d\r\n", automation->opts.boiler_action.ch);
-                    }
-                }
-                if (off[i] != -1)
-                {
-                    state = !automation->inverted ? DO_HIGH : DO_LOW;
-                    real_channel = do_map_channel(off[i]);
-                    prev_level = do_get_level(real_channel);
-                    // on[i] === channel index
-                    if (prev_level != state)
-                    {
-                        do_set_level(real_channel, state); // !state - invert, case OFF[]
-                        ESP_LOGW("automations", "\r\n[INVERSE] Trigger: %d, value: %0.1f, inv:%d", (char)automation->trigger.cond, automation->trigger.value, automation->inverted);
-                        for (int i = 0; i < 6; i++)
-                        {
-                            if (automation->opts.relay_action.off[i] != -1)
-                            {
-                                ESP_LOGW("FIRE_AUTOMATION", "[OFF]Toggle relay i:%d state %s", i, state ? "ON" : "OFF");
-                            }
-                        }
-                        ESP_LOGW("automations", "Boiler: %d\r\n", automation->opts.boiler_action.ch);
-                    }
-                }
-            }
-            break;
+        //         if (on[i] != -1)
+        //         {
+        //             state = automation->inverted ? DO_HIGH : DO_LOW;
+        //             real_channel = do_map_channel(on[i]);
+        //             prev_level = do_get_level(real_channel);
+        //             // TODO PREV STATE and not switch case eq
+        //             // on[i] === channel index
+        //             if (prev_level != state)
+        //             {
+        //                 do_set_level(real_channel, state); // state NOT invert, case ON[]
+        //                 ESP_LOGW("automations", "\r\n[NORMAL]Trigger: %d, value: %0.1f, inv:%d", (char)automation->trigger.cond, automation->trigger.value, automation->inverted);
+        //                 for (int i = 0; i < 6; i++)
+        //                 {
+        //                     if (automation->opts.relay_action.on[i] != -1)
+        //                     {
+        //                         ESP_LOGW("FIRE_AUTOMATION", "[OFF]Toggle relay i:%d state %s", i, state ? "ON" : "OFF");
+        //                     }
+        //                 }
+        //                 ESP_LOGW("automations", "Boiler: %d\r\n", automation->opts.boiler_action.ch);
+        //             }
+        //         }
+        //         if (off[i] != -1)
+        //         {
+        //             state = !automation->inverted ? DO_HIGH : DO_LOW;
+        //             real_channel = do_map_channel(off[i]);
+        //             prev_level = do_get_level(real_channel);
+        //             // on[i] === channel index
+        //             if (prev_level != state)
+        //             {
+        //                 do_set_level(real_channel, state); // !state - invert, case OFF[]
+        //                 ESP_LOGW("automations", "\r\n[INVERSE] Trigger: %d, value: %0.1f, inv:%d", (char)automation->trigger.cond, automation->trigger.value, automation->inverted);
+        //                 for (int i = 0; i < 6; i++)
+        //                 {
+        //                     if (automation->opts.relay_action.off[i] != -1)
+        //                     {
+        //                         ESP_LOGW("FIRE_AUTOMATION", "[OFF]Toggle relay i:%d state %s", i, state ? "ON" : "OFF");
+        //                     }
+        //                 }
+        //                 ESP_LOGW("automations", "Boiler: %d\r\n", automation->opts.boiler_action.ch);
+        //             }
+        //         }
+        //     }
+        //     break;
         default:
             break;
         }

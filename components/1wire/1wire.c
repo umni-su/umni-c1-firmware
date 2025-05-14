@@ -82,49 +82,52 @@ void um_onewire_update_state(uint64_t address, float temp)
         if (sensors[i].address != 0 && sensors[i].address == address)
         {
             sensors[i].value = temp;
-            if (automations[i].ext)
-            {
-                // Compare values
-                bool conditionMatch = false;
-                switch (automations[i].trigger.cond)
-                {
-                case UM_AM_TRIG_EQUAL:
-                    conditionMatch = temp == automations[i].trigger.value;
-                    break;
-                case UM_AM_TRIG_MORE:
-                    conditionMatch = temp > automations[i].trigger.value;
-                    break;
-                case UM_AM_TRIG_LESS:
-                    conditionMatch = temp < automations[i].trigger.value;
-                    break;
-                default:
-                    // ,????проблема, не получится инвертровать состояние в событии
-                    conditionMatch = automations[i].inverted;
-                    break;
-                }
-                automations[i].inverted = conditionMatch;
-                um_am_main_t automation = automations[i];
+            automations[i].value = temp;
+            um_am_automation_run(&automations[i]);
+            // if (automations[i].ext)
+            // {
+            //     // Compare values
+            //     bool conditionMatch = false;
+            //     switch (automations[i].trigger.cond)
+            //     {
+            //     case UM_AM_TRIG_EQUAL:
+            //         conditionMatch = temp == automations[i].trigger.value;
+            //         break;
+            //     case UM_AM_TRIG_MORE:
+            //         conditionMatch = temp > automations[i].trigger.value;
+            //         break;
+            //     case UM_AM_TRIG_LESS:
+            //         conditionMatch = temp < automations[i].trigger.value;
+            //         break;
+            //     default:
+            //         // ,????проблема, не получится инвертровать состояние в событии
+            //         conditionMatch = automations[i].inverted;
+            //         break;
+            //     }
+            //     automations[i].inverted = conditionMatch;
+            //     um_am_main_t automation = automations[i];
 
-                // Fire automation
-                // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION START ====================");
-                ESP_LOGW("FIRE_AUTOMATION", "Fire for i:%d, sn:%08llx, temp: %0.1f", i, sensors[i].address, temp);
-                // for (int i = 0; i < 6; i++)
-                // {
-                //     if (automation.opts.relay_action.on[i] != -1)
-                //     {
-                //         ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, !automation.inverted ? "ON" : "OFF");
-                //     }
-                // }
-                // for (int i = 0; i < 6; i++)
-                // {
-                //     if (automation.opts.relay_action.off[i] != -1)
-                //     {
-                //         ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, automation.inverted ? "ON" : "OFF");
-                //     }
-                // }
-                // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION END ====================");
-                esp_event_post(APP_EVENTS, EV_AUTOMATION_FIRED, (void *)&automation, sizeof(um_am_main_t), portMAX_DELAY);
-            }
+            //     // Fire automation
+            //     // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION START ====================");
+            //     ESP_LOGW("FIRE_AUTOMATION", "Fire for i:%d, sn:%08llx, temp: %0.1f", i, sensors[i].address, temp);
+            //     for (int i = 0; i < 6; i++)
+            //     {
+            //         if (automation.opts.relay_action.on[i] != -1)
+            //         {
+            //             ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, !automation.inverted ? "ON" : "OFF");
+            //         }
+            //     }
+            //     for (int i = 0; i < 6; i++)
+            //     {
+            //         if (automation.opts.relay_action.off[i] != -1)
+            //         {
+            //             ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, automation.inverted ? "ON" : "OFF");
+            //         }
+            //     }
+            //     ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION END ====================");
+            //     esp_event_post(APP_EVENTS, EV_AUTOMATION_FIRED, (void *)&automation, sizeof(um_am_main_t), portMAX_DELAY);
+
+            // }
             break;
         }
     }
