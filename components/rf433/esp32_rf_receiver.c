@@ -223,7 +223,7 @@ void esp_rf433_initialize(int pin, void *handler)
       gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
       gpio_isr_handler_add(pin, esp_rf433_data_interrupt_handler, NULL);
 
-      xTaskCreate(handler, "um_rf433", 2048, s_esp_RF433_queue, 3, NULL);
+      xTaskCreate(handler, "um_rf433", 4096, s_esp_RF433_queue, 3, NULL);
     }
   }
 }

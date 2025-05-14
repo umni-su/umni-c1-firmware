@@ -66,7 +66,7 @@ esp_err_t initialize_ntc_channels()
     ntc_config_t ntc_config = {
         .b_value = 3950,
         .r25_ohm = 10000,
-        .fixed_ohm = 11000,
+        .fixed_ohm = 10000,
         .vdd_mv = 3300,
         .circuit_mode = CIRCUIT_MODE_NTC_GND,
         .atten = ADC_ATTEN_DB_12,
