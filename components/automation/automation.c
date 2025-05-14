@@ -230,19 +230,22 @@ void um_am_automation_run(um_am_main_t *config)
   {
   case UM_AM_TRIG_EQUAL:
     conditionMatch = config->value == config->trigger.value;
+    config->inverted = conditionMatch;
     break;
   case UM_AM_TRIG_MORE:
     conditionMatch = config->value > config->trigger.value;
+    config->inverted = conditionMatch;
     break;
   case UM_AM_TRIG_LESS:
     conditionMatch = config->value < config->trigger.value;
+    config->inverted = conditionMatch;
     break;
   default:
     // ????проблема, не получится инвертровать состояние в событии
-    conditionMatch = config->inverted;
+    conditionMatch = true;
     break;
   }
-  config->inverted = conditionMatch;
+
   // Климат
   if (um_am_automation_has_boiler(config))
   {
@@ -258,7 +261,7 @@ void um_am_automation_run(um_am_main_t *config)
         unsigned short int state;
         int prev_level;
         int real_channel;
-        state = config->inverted ? DO_HIGH : DO_LOW;
+        state = !config->inverted ? DO_HIGH : DO_LOW;
         // real_channel = do_map_channel(config->opts.relay_action.on[i]);
         real_channel = config->opts.relay_action.on[i];
         prev_level = do_get_level(real_channel);

@@ -1,10 +1,9 @@
-// #pragma once
+#pragma once
 #include "cJSON.h"
 #include <stdbool.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
-void um_am_test();
 typedef enum
 {
     UM_AM_TRIG_ALWAYS = 1,

@@ -5,18 +5,19 @@
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 #include "../config/config.h"
+#include "../automation/automation.h"
 
-uint8_t input_data = 0xff;
+static uint8_t input_data = 0xff;
 
-uint8_t output_data = 0xff;
+static uint8_t output_data = 0xff;
 
 static i2c_dev_t pcf8574_output_dev_t;
 
 static i2c_dev_t pcf8574_input_dev_t;
 
-bool need_blink_stat = false;
+static bool need_blink_stat = false;
 
-bool need_blink_err = false;
+static bool need_blink_err = false;
 
 static led_blink_t led_blink_stat_conf;
 
@@ -25,11 +26,7 @@ static led_blink_t led_blink_err_conf;
 static uint8_t current_state;
 
 /** DI Automation action configuration */
-di_automation_relay_config_t automation_relay_config[6];
-
-di_automation_opentherm_config_t automation_opentherm_config[6];
-
-// um_am_main_t input_ports_automations[6];
+static um_am_main_t di_automation[6];
 
 uint8_t do_get_nvs_state()
 {
@@ -58,16 +55,6 @@ esp_err_t do_restore_all_values()
 
 esp_err_t init_do()
 {
-    for (int i = 0; i < 6; i++)
-    {
-        automation_relay_config[i].ext = false;
-        for (int j = 0; j < 6; j++)
-        {
-            automation_relay_config[i].on[j] = -1;
-            automation_relay_config[i].off[j] = -1;
-        }
-        automation_opentherm_config[i].ch = -1;
-    }
     char *config_file = um_config_get_config_file_dio();
 
     cJSON *config = cJSON_Parse(config_file);
@@ -82,60 +69,8 @@ esp_err_t init_do()
             if (port >= 0)
             {
                 // TEST AUTOMATIONS HERE
-                // um_am_parse_json_config(di_el, &input_ports_automations[port]);
+                um_am_parse_json_config(di_el, &di_automation[port]);
                 // TEST AUTOMATIONS HERE
-                bool ext = cJSON_HasObjectItem(di_el, "ext") ? cJSON_GetObjectItem(di_el, "ext")->valueint == 1 : false;
-
-                // ARRAY OF OPTIONS
-                cJSON *options = cJSON_HasObjectItem(di_el, "opt") ? cJSON_GetObjectItem(di_el, "opt") : NULL;
-
-                if (options != NULL)
-                {
-                    cJSON *opt = NULL;
-                    cJSON_ArrayForEach(opt, options)
-                    {
-                        cJSON *type = cJSON_HasObjectItem(opt, "type") ? cJSON_GetObjectItem(opt, "type") : NULL;
-
-                        if (type != NULL && type->valueint == 1) // тип автоматизации - реле
-                        {
-                            cJSON *val = NULL;
-                            cJSON *on = cJSON_GetObjectItem(opt, "on");
-                            cJSON *off = cJSON_GetObjectItem(opt, "off");
-
-                            unsigned short int i = 0;
-
-                            if (on)
-                            {
-                                cJSON_ArrayForEach(val, on)
-                                {
-                                    automation_relay_config[port].on[i] = val->valueint;
-                                    // ESP_LOGE("!!!!!!!!!!!", "automation_relay_config port:%d i:%d val:%d", port, i, val->valueint);
-                                    i++;
-                                }
-                                // ESP_LOGE("!!!!!!!!!!!", "automation_relay_config.on[3]:%d", automation_relay_config[port].on[3]);
-                            }
-
-                            i = 0;
-                            val = NULL;
-
-                            if (off)
-                            {
-                                cJSON_ArrayForEach(val, off)
-                                {
-                                    automation_relay_config[port].off[i] = val->valueint;
-                                    i++;
-                                }
-                            }
-
-                            automation_relay_config[port].ext = ext;
-                        }
-                        else if (type != NULL && type->valueint == 2) // тип автоматизации - котел
-                        {
-                            unsigned short int ch = cJSON_GetObjectItem(opt, "ch")->valueint; // включить или выключить котел
-                            automation_opentherm_config[port].ch = ch;
-                        }
-                    }
-                }
             }
         }
     }
@@ -452,6 +387,13 @@ bool di_is_config_mode()
     return level == DI_LOW;
 }
 
+/**
+ * Main interrupt handler.a64lCatch interrupts from pcf8574
+ *
+ * @param   void  arg
+ *
+ * @return  void
+ */
 void di_interrupt_task(void *arg)
 {
     pcf8574_port_read(&pcf8574_input_dev_t, &current_state);
@@ -466,51 +408,15 @@ void di_interrupt_task(void *arg)
                 ESP_LOGW("dio intr", "Pin #%d has value %d", i, pin_level);
                 input_data = current_state; // set last level to input pins
 
+                // Update automation value
+                di_automation[i].value = pin_level;
+                di_automation[i].inverted = pin_level == DI_LOW;
+                // Run automation
+                um_am_automation_run(&di_automation[i]);
+
                 um_ev_message_dio message = {
                     .index = i,
                     .level = pin_level};
-
-                // if (pin_level == 1)
-                //{
-
-                if (automation_relay_config[i].ext)
-                {
-                    for (int j = 0; j < 6; j++)
-                    {
-                        // передаем нормальное состояние для группы реле на "вкл"
-                        int channel_on = automation_relay_config[i].on[j];
-                        // ESP_LOGI(
-                        //     "AUTO",
-                        //     "ch %d, ext: %d, on: %d, off: %d",
-                        //     i, automation_relay_config[i].ext, automation_relay_config[i].on[j], automation_relay_config[i].off[j]);
-                        if (channel_on >= 0)
-                        {
-                            do_set_level(channel_on, pin_level);
-                        }
-                        // передаем инверсное состояние для группы реле на "выкл"
-                        int channel_off = automation_relay_config[i].off[j];
-                        if (channel_off >= 0)
-                        {
-                            do_set_level(channel_off, !pin_level);
-                        }
-                    }
-                }
-
-                short int ch = automation_opentherm_config[i].ch;
-                if (ch >= 0)
-                {
-                    int ot_ch = automation_opentherm_config[i].ch;
-                    if (pin_level == 0)
-                    {
-                        ot_ch = ot_ch == 1 ? 0 : 1;
-                    }
-                    ESP_LOGI("dio auto", "Set boiler state to %d", ot_ch);
-                    esp_event_post(APP_EVENTS, ot_ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
-                    vTaskDelay(100 / portTICK_PERIOD_MS);
-                }
-
-                //}
-
                 esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_DI, &message, sizeof(message), portMAX_DELAY);
             }
         }
