@@ -407,7 +407,7 @@ void um_ot_init()
 
     ot_data.hwa = enableHotWater;
 
-    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 3, &ot_handle, 1);
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 2, &ot_handle, 0);
 }
 
 um_ot_data_t um_ot_get_data()

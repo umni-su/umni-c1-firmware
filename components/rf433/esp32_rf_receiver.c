@@ -151,9 +151,7 @@ unsigned int *esp_rf433_get_received_raw_data()
   return timings;
 }
 
-// ---
-
-void esp_rf433_data_interrupt_handler(void *arg)
+void esp_rf433_interrupt_task(void *arg)
 {
   static unsigned int changeCount = 0;
   static unsigned long lastTime = 0;
@@ -200,6 +198,13 @@ void esp_rf433_data_interrupt_handler(void *arg)
 
   timings[changeCount++] = duration;
   lastTime = time;
+
+  vTaskDelete(NULL);
+}
+
+static void IRAM_ATTR esp_rf433_data_interrupt_handler(void *arg)
+{
+  xTaskCreate(esp_rf433_interrupt_task, "esp_rf433_task", 4096, NULL, 2, NULL);
 }
 
 void esp_rf433_initialize(int pin, void *handler)
@@ -223,7 +228,7 @@ void esp_rf433_initialize(int pin, void *handler)
       gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
       gpio_isr_handler_add(pin, esp_rf433_data_interrupt_handler, NULL);
 
-      xTaskCreate(handler, "um_rf433", 4096, s_esp_RF433_queue, 3, NULL);
+      xTaskCreatePinnedToCore(handler, "um_rf433", configMINIMAL_STACK_SIZE * 4, s_esp_RF433_queue, 4, NULL, 1);
     }
   }
 }

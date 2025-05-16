@@ -20,7 +20,7 @@ static um_rf_devices_t rf_devices[MAX_SENSORS];
 
 static um_rf_devices_t rf_scanned_devices[MAX_SEARCH_SENSORS];
 
-static QueueHandle_t esp_rf433_queue = NULL;
+QueueHandle_t esp_rf433_queue = NULL;
 
 static um_am_main_t rf_automations[MAX_SENSORS];
 
@@ -283,5 +283,5 @@ void um_rf433_activale_search()
 {
     if (search)
         return;
-    xTaskCreatePinnedToCore(um_rf433_search_handle, "rf433_search", configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL, 1);
+    xTaskCreate(um_rf433_search_handle, "rf433_search", configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
 }

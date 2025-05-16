@@ -203,7 +203,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         connected = true;
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
 
-        xTaskCreatePinnedToCore(um_mqtt_register_task, "mqtt_register_task", configMINIMAL_STACK_SIZE * 2, NULL, 3, &mqtt_register_handler, 1);
+        xTaskCreatePinnedToCore(um_mqtt_register_task, "mqtt_register_task", configMINIMAL_STACK_SIZE * 2, NULL, 5, &mqtt_register_handler, 1);
 
         // SUBSCRIBE HERE!
 

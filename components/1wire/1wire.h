@@ -10,7 +10,7 @@
 #define ONE_WIRE_PIN CONFIG_UMNI_ONEWIRE_PIN // hc32esp default 1wire pin
 #define ONE_WIRE "onewire"
 #define ONEWIRE_MAX_SENSORS 10 // max sensors on bus
-#define ONE_WIRE_TASK_PRIORITY 3
+#define ONE_WIRE_TASK_PRIORITY 4
 
 typedef struct
 {

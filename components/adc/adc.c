@@ -107,11 +107,17 @@ void ai_queue_task()
 {
     while (true)
     {
-        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, AN_INP_1, &adc_raw[0][0]));
+        esp_err_t err;
+
+        err = adc_oneshot_read(adc_handle, AN_INP_1, &adc_raw[0][0]);
+        if (err != ESP_OK)
+            continue;
         ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, AN_INP_1, adc_raw[0][0]);
         if (do_calibration1_chan0)
         {
-            ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc_cali_ai1_handle, adc_raw[0][0], &voltage[0][0]));
+            err = adc_cali_raw_to_voltage(adc_cali_ai1_handle, adc_raw[0][0], &voltage[0][0]);
+            if (err != ESP_OK)
+                continue;
             ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_1, voltage[0][0]);
         }
         um_ev_message_ai ai1 = {
@@ -122,12 +128,16 @@ void ai_queue_task()
 
         vTaskDelay(pdMS_TO_TICKS(1000));
 
-        ESP_ERROR_CHECK(adc_oneshot_read(adc_handle, AN_INP_2, &adc_raw[0][1]));
+        err = adc_oneshot_read(adc_handle, AN_INP_2, &adc_raw[0][1]);
+        if (err != ESP_OK)
+            continue;
         float lux = (adc_raw[0][1] * 100) / 4095;
         ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d, LUX: %0.1f", ADC_UNIT_1 + 1, AN_INP_2, adc_raw[0][1], lux);
         if (do_calibration1_chan1)
         {
-            ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc_cali_ai2_handle, adc_raw[0][1], &voltage[0][1]));
+            err = adc_cali_raw_to_voltage(adc_cali_ai2_handle, adc_raw[0][1], &voltage[0][1]);
+            if (err != ESP_OK)
+                continue;
             ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_2, voltage[0][1]);
         }
 
@@ -251,11 +261,11 @@ void init_adc()
     }
     else
     {
-        xTaskCreatePinnedToCore(ntc_queue_task, "ntc_task", 4096, NULL, 3, &adc_task_handle, 1);
+        xTaskCreatePinnedToCore(ntc_queue_task, "ntc_task", 4096, NULL, 4, &adc_task_handle, 1);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         // xTaskCreatePinnedToCore(ntc_queue_task, "ntc2_task", 4096, (void *)ntc_chan_2_handle, 3, &adc_task_handle, 1);
         // vTaskDelay(1000 / portTICK_PERIOD_MS);
-        xTaskCreatePinnedToCore(ai_queue_task, "ai_task", 4096, NULL, 3, &adc_task_handle, 1);
+        xTaskCreatePinnedToCore(ai_queue_task, "ai_task", 4096, NULL, 4, &adc_task_handle, 1);
     }
 
     // vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);

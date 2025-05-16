@@ -54,7 +54,7 @@ typedef struct
     uint8_t fd;
 } um_webserver_token_t;
 
-static um_webserver_token_t auth_tokens[MAX_CLIENTS];
+static um_webserver_token_t auth_token;
 
 typedef struct rest_server_context
 {
@@ -119,14 +119,8 @@ static void um_webserver_get_auth_token(httpd_req_t *req, char *out)
  */
 static void um_webserver_add_auth_user(um_webserver_token_t token)
 {
-    for (int i = 0; i < MAX_CLIENTS; i++)
-    {
-        if (auth_tokens[i].fd == 0 || auth_tokens[i].timestamp == 0)
-        {
-            auth_tokens[i].fd = token.fd;
-            auth_tokens[i].timestamp = token.timestamp;
-        }
-    }
+    auth_token.fd = token.fd;
+    auth_token.timestamp = token.timestamp;
 }
 
 /**
@@ -136,40 +130,22 @@ static void um_webserver_add_auth_user(um_webserver_token_t token)
  */
 static void um_webserver_delete_user_token(httpd_req_t *req)
 {
-    char token[36];
-    char loop_token[36];
-
-    um_webserver_get_auth_token(req, token);
-    for (int i = 0; i < MAX_CLIENTS; i++)
-    {
-        if (auth_tokens[i].fd != 0 || auth_tokens[i].timestamp != 0)
-        {
-            sprintf(loop_token, "%lld:%d", auth_tokens[i].timestamp, auth_tokens[i].fd);
-            if (strcmp(loop_token, token) == 0)
-            {
-                auth_tokens[i].fd = 0;
-                auth_tokens[i].timestamp = 0;
-            }
-        }
-    }
+    auth_token.fd = 0;
+    auth_token.timestamp = 0;
 }
 
 static bool um_webserver_is_authenticated(httpd_req_t *req)
 {
     char token[36];
+    char check_token[36];
     um_webserver_get_auth_token(req, token);
-    for (int i = 0; i < MAX_CLIENTS; i++)
+    if (auth_token.fd > 0 && auth_token.timestamp > 0)
     {
-        char loop_token[36];
-
-        if (auth_tokens[i].fd > 0 && auth_tokens[i].timestamp > 0)
+        sprintf(check_token, "%lld:%d", auth_token.timestamp, auth_token.fd);
+        if (strcmp(check_token, token) == 0)
         {
-            sprintf(loop_token, "%lld:%d", auth_tokens[i].timestamp, auth_tokens[i].fd);
-            if (strcmp(loop_token, token) == 0)
-            {
-                ESP_LOGI(REST_TAG, "You are authenticated");
-                return true;
-            }
+            ESP_LOGI(REST_TAG, "You are authenticated");
+            return true;
         }
     }
     ESP_LOGW(REST_TAG, "You are NOT authenticated with token: %s", token);
