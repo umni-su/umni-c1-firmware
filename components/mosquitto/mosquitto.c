@@ -329,7 +329,7 @@ char *um_mqtt_get_full_topic(char *topic)
  */
 esp_err_t um_mqtt_publish_data(char *topic, char *data)
 {
-    if (topic == NULL)
+    if (topic == NULL || data == NULL)
         return ESP_FAIL;
     size_t prefix_len = strcmp(topic, UM_TOPIC_REGISTER) == 0 ? 0 : strlen(UM_TOPIC_PREFIX_DEVICE);
     size_t len = strlen(topic) + strlen(name) + prefix_len + 1;
@@ -342,8 +342,8 @@ esp_err_t um_mqtt_publish_data(char *topic, char *data)
     }
     if (client != NULL)
     {
-
-        ESP_LOGI("MQTT", "Send data to server: %s, %s", real_topic, data);
+        ESP_LOGI("MQTT", "Send data to topic %s (len  %d)", real_topic, strlen(data));
+        // ESP_LOGI("MQTT", "Send data to server: %s, %s", real_topic, data);
         msg_id = esp_mqtt_client_publish(client, real_topic, data, 0, 0, 0);
     }
     res = ESP_OK;
