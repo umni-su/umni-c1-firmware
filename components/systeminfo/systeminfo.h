@@ -23,7 +23,6 @@ typedef struct
     int model;
     char *idf_ver;
     char *fw_ver;
-    char *fw_ver_web;
     um_netif_data_type_t ip_eth_info;
     um_netif_data_type_t ip_wifi_info;
 

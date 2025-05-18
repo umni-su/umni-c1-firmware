@@ -154,7 +154,6 @@ um_systeminfo_data_type_t um_systeminfo_get_struct_data()
     data.model = (int)info.model;
     data.idf_ver = IDF_VER;
     data.fw_ver = FW_VER;
-    data.fw_ver_web = FW_VER_WEB;
     data.ip_eth_info.name = eth_ip_info.name;
     data.ip_eth_info.ip = eth_ip_info.ip;
     data.ip_eth_info.mask = eth_ip_info.mask;

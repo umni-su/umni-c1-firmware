@@ -373,7 +373,6 @@ esp_err_t um_mqtt_register_device()
     // cJSON_AddNumberToObject(systeminfo, "free_heap", system_info.free_heap);
     // cJSON_AddNumberToObject(systeminfo, "total_heap", system_info.total_heap);
     // cJSON_AddStringToObject(systeminfo, "fw_ver", system_info.fw_ver);
-    // cJSON_AddStringToObject(systeminfo, "fw_ver_web", system_info.fw_ver_web);
     // cJSON_AddNumberToObject(systeminfo, "chip", system_info.chip);
     // cJSON_AddNumberToObject(systeminfo, "cores", system_info.cores);
     // cJSON_AddNumberToObject(systeminfo, "revision", system_info.model);

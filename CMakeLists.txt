@@ -6,7 +6,6 @@ cmake_minimum_required(VERSION 3.16)
 set(EXTRA_COMPONENT_DIRS "..\\..\\esp-idf-lib\\components")
 
 set (FW_VER "1.0.0")
-set (FW_VER_WEB "1.0.0")
 
 # Specify the configuration file from which the header file will be generated
 configure_file (config.h.in config.h @ONLY)

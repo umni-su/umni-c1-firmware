@@ -289,7 +289,6 @@ static esp_err_t system_info_get_handler(httpd_req_t *req)
         cJSON_AddNumberToObject(root, "free_heap", info.free_heap);
         cJSON_AddNumberToObject(root, "total_heap", info.total_heap);
         cJSON_AddStringToObject(root, "fw_ver", info.fw_ver);
-        cJSON_AddStringToObject(root, "fw_ver_web", info.fw_ver_web);
         cJSON_AddNumberToObject(root, "chip", info.chip);
         cJSON_AddNumberToObject(root, "cores", info.cores);
         cJSON_AddNumberToObject(root, "revision", info.model);
