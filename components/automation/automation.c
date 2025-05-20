@@ -188,7 +188,7 @@ void um_am_parse_json_config(cJSON *sensor_json, um_am_main_t *config)
 
 bool um_am_automation_has_boiler(um_am_main_t *config)
 {
-  return config->ext && config->opts.boiler_action.ch > -1;
+  return config->ext && (int)config->opts.boiler_action.ch > -1;
 }
 
 bool um_am_automation_has_relays(um_am_main_t *config)
@@ -251,7 +251,12 @@ void um_am_automation_run(um_am_main_t *config)
   // Климат
   if (um_am_automation_has_boiler(config))
   {
-    esp_event_post(APP_EVENTS, config->opts.boiler_action.ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF, (void *)NULL, sizeof(NULL), portMAX_DELAY);
+    int event = (int)config->opts.boiler_action.ch == 1 ? EV_OT_CH_ON : EV_OT_CH_OFF;
+    if (!conditionMatch)
+    {
+      event = event == EV_OT_CH_ON ? EV_OT_CH_OFF : EV_OT_CH_ON;
+    }
+    esp_event_post(APP_EVENTS, event, (void *)NULL, sizeof(NULL), portMAX_DELAY);
   }
 
   // Реле
