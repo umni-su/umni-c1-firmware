@@ -107,30 +107,30 @@ void esp_ot_control_task_handler(void *pvParameter)
             if (ot_response_status == OT_STATUS_SUCCESS)
             {
                 // установка модуляции
-                stat = esp_ot_set_modulation_level(ot_data.mod);
-                if (!stat)
-                {
-                    ESP_LOGE(TAG, "Error set modulation level");
-                }
-                else
-                {
-                    ESP_LOGI(TAG, "Modulation level set success to %d", ot_data.mod);
-                }
+                // stat = esp_ot_set_modulation_level(ot_data.mod);
+                // if (!stat)
+                // {
+                //     ESP_LOGE(TAG, "Error set modulation level");
+                // }
+                // else
+                // {
+                //     ESP_LOGI(TAG, "Modulation level set success to %d", ot_data.mod);
+                // }
                 // установка кривой нагрева
                 if (enableOutsideTemperatureCompensation)
                 {
-                    if (ot_data.othcr > 0 && ot_data.othcr < 100)
-                    {
-                        stat = esp_ot_set_otc_curve_ratio(ot_data.othcr);
-                        if (!stat)
-                        {
-                            ESP_LOGE(TAG, "Error set heat curve ratio");
-                        }
-                        else
-                        {
-                            ESP_LOGE(TAG, "Heat curve ratio set success");
-                        }
-                    }
+                    // if (ot_data.othcr > 0 && ot_data.othcr < 100)
+                    // {
+                    //     stat = esp_ot_set_otc_curve_ratio(ot_data.othcr);
+                    //     if (!stat)
+                    //     {
+                    //         ESP_LOGE(TAG, "Error set heat curve ratio");
+                    //     }
+                    //     else
+                    //     {
+                    //         ESP_LOGE(TAG, "Heat curve ratio set success");
+                    //     }
+                    // }
                 }
 
                 ot_data.ready = false;
@@ -407,7 +407,7 @@ void um_ot_init()
 
     ot_data.hwa = enableHotWater;
 
-    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 2, &ot_handle, 0);
+    xTaskCreatePinnedToCore(esp_ot_control_task_handler, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 2, &ot_handle, 1);
 }
 
 um_ot_data_t um_ot_get_data()

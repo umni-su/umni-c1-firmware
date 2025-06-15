@@ -53,7 +53,7 @@ void onewire_task(void *arg)
                                 .sn = string_address,
                                 .temp = temp};
                             esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
-                            loop_count = 0;
+                            vTaskDelay(1000 / portTICK_PERIOD_MS);
                         }
 
                         um_onewire_update_state(addresses[i], temp);
@@ -65,10 +65,14 @@ void onewire_task(void *arg)
                     break;
                 }
             }
-            if (loop_count < total_loops)
-            {
-                loop_count++;
-            }
+        }
+        if (loop_count < total_loops)
+        {
+            loop_count++;
+        }
+        else
+        {
+            loop_count = 0;
         }
         vTaskDelay(ONEWIRE_TASK_TIMEOUT / portTICK_PERIOD_MS);
     }

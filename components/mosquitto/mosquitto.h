@@ -8,12 +8,13 @@
 /**
  * MQTT AVAILABLE TOPICS
  */
-#define UM_TOPIC_REGISTER "register" // Device registration topic  NO / SLASH!!!
+#define UM_TOPIC_REGISTER "/register" // Device registration topic  NO / SLASH!!!
 #define UM_TOPIC_REGISTERED "/registered"
 #define UM_TOPIC_CONFIGURATION "/cnf" // Device send configuration topic
 #define UM_TOPIC_CONFIGURATION_DIO "/cnf/dio"
 #define UM_TOPIC_CONFIGURATION_OW "/cnf/ow"
 #define UM_TOPIC_CONFIGURATION_RF433 "/cnf/rf"
+#define UM_TOPIC_CONFIGURATION_AI "/cnf/ai"
 #define UM_TOPIC_STATUS "/st" // Device send status topic
 #define UM_TOPIC_STATUS_DIO "/dio"
 #define UM_TOPIC_STATUS_ONEWIRE "/ow"

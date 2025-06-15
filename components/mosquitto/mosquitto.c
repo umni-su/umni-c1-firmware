@@ -2,7 +2,7 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "mosquitto.h"
-
+#include "esp_timer.h"
 #include "../config/config.h"
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
@@ -245,18 +245,25 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         cJSON *topic = cJSON_HasObjectItem(json, "topic") ? cJSON_GetObjectItem(json, "topic") : NULL;
         if (topic != NULL)
         {
+            // TOPIC=manage/umni0a99f0/rel
+            // DATA={"index":2,"level":1}
             if (strcmp(topic->valuestring, "rel") == 0)
             {
                 do_port_index_t index = cJSON_GetObjectItem(json, "index")->valueint;
                 do_level_t level = cJSON_GetObjectItem(json, "level")->valueint;
                 do_set_level(index, level);
             }
+            else if (strcmp(topic->valuestring, "ping") == 0)
+            {
+                cJSON_SetValuestring(topic, "pong");
+                cJSON_AddBoolToObject(json, "success", true);
+                char *data = cJSON_PrintUnformatted(json);
+                um_mqtt_publish_data(UM_TOPIC_PONG, data);
+                free((void *)data);
+            }
         }
 
         cJSON_Delete(json);
-
-        // TOPIC=manage/umni0a99f0/rel
-        // DATA={"index":2,"level":1}
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_ERROR");
@@ -331,10 +338,12 @@ esp_err_t um_mqtt_publish_data(char *topic, char *data)
 {
     if (topic == NULL || data == NULL)
         return ESP_FAIL;
-    size_t prefix_len = strcmp(topic, UM_TOPIC_REGISTER) == 0 ? 0 : strlen(UM_TOPIC_PREFIX_DEVICE);
+    // size_t prefix_len = strcmp(topic, UM_TOPIC_REGISTER) == 0 ? 0 : strlen(UM_TOPIC_PREFIX_DEVICE);
+    size_t prefix_len = strlen(UM_TOPIC_PREFIX_DEVICE);
     size_t len = strlen(topic) + strlen(name) + prefix_len + 1;
     char real_topic[len];
-    sprintf(real_topic, "%s%s%s", UM_TOPIC_PREFIX_DEVICE, strcmp(topic, UM_TOPIC_REGISTER) == 0 ? "" : name, topic);
+    // sprintf(real_topic, "%s%s%s", UM_TOPIC_PREFIX_DEVICE, strcmp(topic, UM_TOPIC_REGISTER) == 0 ? "" : name, topic);
+    sprintf(real_topic, "%s%s%s", UM_TOPIC_PREFIX_DEVICE, name, topic);
     esp_err_t res = ESP_OK;
     if (!connected)
     {
@@ -365,6 +374,12 @@ esp_err_t um_mqtt_register_device()
     // const um_systeminfo_data_type_t system_info = um_systeminfo_get_struct_data();
 
     // cJSON *systeminfo = cJSON_CreateObject();
+
+    cJSON_AddNumberToObject(systeminfo, "uptime", esp_timer_get_time());
+    cJSON_AddNumberToObject(systeminfo, "free_heap", esp_get_free_heap_size());
+    cJSON_AddNumberToObject(systeminfo, "total_heap", heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
+    cJSON_AddStringToObject(systeminfo, "fw_ver", CONFIG_APP_PROJECT_VER);
+    cJSON_AddStringToObject(systeminfo, "idf_ver", IDF_VER);
 
     // cJSON_AddStringToObject(systeminfo, "date", system_info.date);
     // cJSON_AddStringToObject(systeminfo, "last_reset", system_info.last_reset);
@@ -423,6 +438,20 @@ esp_err_t um_mqtt_send_config()
     {
         json_str = cJSON_PrintUnformatted(json_config);
         um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_OW, json_str);
+    }
+
+    free(json_str);
+    cJSON_Delete(json_config);
+    free(config);
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    config = um_config_get_config_file(CONFIG_FILE_AI);
+    json_config = cJSON_Parse(config);
+    if (!cJSON_IsInvalid(json_config))
+    {
+        json_str = cJSON_PrintUnformatted(json_config);
+        um_mqtt_publish_data(UM_TOPIC_CONFIGURATION_AI, json_str);
     }
 
     free(json_str);
