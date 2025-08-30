@@ -222,6 +222,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         connected = false;
+        if (mqtt_register_handler) {
+            vTaskDelete(mqtt_register_handler);
+            mqtt_register_handler = NULL;
+        }
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
         break;
 
@@ -283,8 +287,22 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     connection_status.success = connected;
 }
 
+char *_get_lwt_payload() {
+    static char lwt_topic[30]; // Статическая память (существует всегда)
+    snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/lwt", 
+             UM_TOPIC_PREFIX_DEVICE, name);
+    return lwt_topic; // Указатель на постоянную память
+}
+
 void um_mqtt_init()
 {
+    um_mqtt_deinit();
+
+    if (client != NULL) {
+        ESP_LOGI(MQTT_TAG, "MQTT client already initialized");
+        return;
+    }
+
     name = um_nvs_read_str(NVS_KEY_MACNAME);
     if (name == NULL || strlen(name) < 4)
     { // UMNI
@@ -308,9 +326,21 @@ void um_mqtt_init()
     size_t len = strlen(url);
     char address_with_protocol[len + 10];
     sprintf(address_with_protocol, "mqtt://%s", url);
+
+    char *lwt_topic = _get_lwt_payload();
+
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = address_with_protocol,
-        .broker.address.port = port};
+        .broker.address.port = port,
+        .session.keepalive = 30,
+        .session.last_will = {
+            .topic = lwt_topic, // "device/umnixxxxxx/lwt"
+            .msg = "offline",
+            .msg_len = 7,
+            .qos = 1,
+            .retain = true
+        }
+    };
     if (username != NULL && password != NULL)
     {
         mqtt_cfg.credentials.username = username;
@@ -324,6 +354,24 @@ void um_mqtt_init()
     esp_mqtt_client_start(client);
 
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_events, NULL));
+}
+
+void um_mqtt_deinit() {
+    if (client) {
+        esp_mqtt_client_stop(client);
+        esp_mqtt_client_destroy(client);
+        client = NULL;
+    }
+    connected = false;
+    
+    // Отписываемся от событий
+    esp_event_handler_unregister(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_events);
+    
+    // Останавливаем задачу регистрации
+    if (mqtt_register_handler) {
+        vTaskDelete(mqtt_register_handler);
+        mqtt_register_handler = NULL;
+    }
 }
 
 char *um_mqtt_get_full_topic(char *topic)

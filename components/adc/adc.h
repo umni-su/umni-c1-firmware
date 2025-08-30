@@ -75,7 +75,9 @@ esp_err_t initialize_ntc_channels();
 
 void um_adc_get_config_file();
 
-void ntc_queue_task(void *ntc_data);
+void ntc_queue_task();
+
+void ai_queue_task();
 
 float get_ntc_data_channel_temp(adc_channel_t channel);
 

@@ -30,6 +30,20 @@ ESP_EVENT_DEFINE_BASE(APP_EVENTS);
 static bool webserver_started = false;
 static bool mqtt_connected = false;
 
+TaskHandle_t sensors_task_handle = NULL;
+
+void read_sensors(void *args)
+{
+    while (true)
+    {
+        onewire_task();
+        ntc_queue_task();
+        ai_queue_task();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    vTaskDelete(NULL);
+}
+
 void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data)
 {
     if ((int)id != 6)
@@ -42,6 +56,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             um_rf_433_init();
             init_adc();
             um_onewire_init();
+            xTaskCreatePinnedToCore(read_sensors, "read_sensors", 4096, NULL, 3, &sensors_task_handle, 1);
             break;
         case EV_CONFIGURATION_READY:
             webserver_start();

@@ -65,6 +65,7 @@ void um_rf433_receiver_task(void *pvParameter)
             //     rf_devices[um_rf433_get_array_length(rf_devices, MAX_SENSORS)] = dev;
             // }
             // else
+
             if (existing_index > -1)
             {
                 dev = rf_devices[existing_index];

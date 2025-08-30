@@ -51,6 +51,8 @@ typedef struct
 
 void um_mqtt_init();
 
+void um_mqtt_deinit();
+
 esp_err_t um_mqtt_publish_data(char *topic, char *data);
 
 char *um_mqtt_get_full_topic(char *topic);

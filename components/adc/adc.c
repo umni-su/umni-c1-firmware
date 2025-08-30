@@ -16,7 +16,7 @@
 
 static const char *ADC_TAG = "adc";
 
-static TaskHandle_t adc_task_handle = NULL;
+// static TaskHandle_t adc_task_handle = NULL;
 static adc_oneshot_unit_handle_t adc_handle = NULL;
 static ntc_device_handle_t ntc_chan_1_handle = NULL;
 static ntc_device_handle_t ntc_chan_2_handle = NULL;
@@ -105,63 +105,63 @@ esp_err_t initialize_ai_channels()
 
 void ai_queue_task()
 {
-    while (true)
+    // while (true)
+    //{
+    esp_err_t err;
+
+    err = adc_oneshot_read(adc_handle, AN_INP_1, &adc_raw[0][0]);
+    if (err != ESP_OK)
+        return;
+    ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, AN_INP_1, adc_raw[0][0]);
+    if (do_calibration1_chan0)
     {
-        esp_err_t err;
-
-        err = adc_oneshot_read(adc_handle, AN_INP_1, &adc_raw[0][0]);
+        err = adc_cali_raw_to_voltage(adc_cali_ai1_handle, adc_raw[0][0], &voltage[0][0]);
         if (err != ESP_OK)
-            continue;
-        ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, AN_INP_1, adc_raw[0][0]);
-        if (do_calibration1_chan0)
-        {
-            err = adc_cali_raw_to_voltage(adc_cali_ai1_handle, adc_raw[0][0], &voltage[0][0]);
-            if (err != ESP_OK)
-                continue;
-            ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_1, voltage[0][0]);
-        }
-        um_ev_message_ai ai1 = {
-            .channel = AN_INP_1,
-            .value = adc_raw[0][0],
-            .voltage = voltage[0][1]};
-        um_adc_update_values(AN_INP_1, ai1.value, ai1.voltage);
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-        err = adc_oneshot_read(adc_handle, AN_INP_2, &adc_raw[0][1]);
-        if (err != ESP_OK)
-            continue;
-        float lux = (adc_raw[0][1] * 100) / 4095;
-        ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d, LUX: %0.1f", ADC_UNIT_1 + 1, AN_INP_2, adc_raw[0][1], lux);
-        if (do_calibration1_chan1)
-        {
-            err = adc_cali_raw_to_voltage(adc_cali_ai2_handle, adc_raw[0][1], &voltage[0][1]);
-            if (err != ESP_OK)
-                continue;
-            ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_2, voltage[0][1]);
-        }
-
-        um_ev_message_ai ai2 = {
-            .channel = AN_INP_2,
-            .value = adc_raw[0][1],
-            .voltage = voltage[0][0]};
-        um_adc_update_values(AN_INP_2, ai2.value, ai2.voltage);
-
-        if (ai_loop_count >= NOTIFICATION_LOOP_COUNT)
-        {
-            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_AI, &ai2, sizeof(um_ev_message_ai), portMAX_DELAY);
-
-            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_AI, &ai1, sizeof(um_ev_message_ai), portMAX_DELAY);
-
-            ai_loop_count = 0;
-        }
-        else
-        {
-            ai_loop_count++;
-        }
-        vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);
+            return;
+        ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_1, voltage[0][0]);
     }
-    vTaskDelete(NULL);
+    um_ev_message_ai ai1 = {
+        .channel = AN_INP_1,
+        .value = adc_raw[0][0],
+        .voltage = voltage[0][1]};
+    um_adc_update_values(AN_INP_1, ai1.value, ai1.voltage);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    err = adc_oneshot_read(adc_handle, AN_INP_2, &adc_raw[0][1]);
+    if (err != ESP_OK)
+        return;
+    float lux = (adc_raw[0][1] * 100) / 4095;
+    ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Raw Data: %d, LUX: %0.1f", ADC_UNIT_1 + 1, AN_INP_2, adc_raw[0][1], lux);
+    if (do_calibration1_chan1)
+    {
+        err = adc_cali_raw_to_voltage(adc_cali_ai2_handle, adc_raw[0][1], &voltage[0][1]);
+        if (err != ESP_OK)
+            return;
+        ESP_LOGI(ADC_TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, AN_INP_2, voltage[0][1]);
+    }
+
+    um_ev_message_ai ai2 = {
+        .channel = AN_INP_2,
+        .value = adc_raw[0][1],
+        .voltage = voltage[0][0]};
+    um_adc_update_values(AN_INP_2, ai2.value, ai2.voltage);
+
+    if (ai_loop_count >= NOTIFICATION_LOOP_COUNT)
+    {
+        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_AI, &ai2, sizeof(um_ev_message_ai), portMAX_DELAY);
+
+        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_AI, &ai1, sizeof(um_ev_message_ai), portMAX_DELAY);
+
+        ai_loop_count = 0;
+    }
+    else
+    {
+        ai_loop_count++;
+    }
+    vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);
+    //}
+    // vTaskDelete(NULL);
 }
 
 void um_ntc_process_channel_request(analog_inputs_t channel)
@@ -177,66 +177,53 @@ void um_ntc_process_channel_request(analog_inputs_t channel)
     }
 }
 
-void ntc_queue_task(void *arg)
+void ntc_queue_task()
 {
-    // ntc_device_handle_t handle = (ntc_device_handle_t)arg;
-    //  analog_inputs_t chan;
-    //  int index = 0;
-    //   if (handle == ntc_chan_1_handle)
-    //   {
-    //       index = 0;
-    //       chan = AN_NTC_1;
-    //   }
-    //   else
-    //   {
-    //       index = 1;
-    //       chan = AN_NTC_2;
-    //   }
-    while (true)
+    // while (true)
+    //{
+    //  NTC 1
+    um_ntc_process_channel_request(AN_NTC_1);
+    // NTC 2
+    um_ntc_process_channel_request(AN_NTC_2);
+
+    if (ntc_loop_count >= NOTIFICATION_LOOP_COUNT)
     {
-        // NTC 1
-        um_ntc_process_channel_request(AN_NTC_1);
-        // NTC 2
-        um_ntc_process_channel_request(AN_NTC_2);
+        um_ev_message_ntc message;
 
-        if (ntc_loop_count >= NOTIFICATION_LOOP_COUNT)
-        {
-            um_ev_message_ntc message;
+        // Send notification NTC1
+        message.channel = AN_NTC_1;
+        message.temp = ntc_data[0];
+        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-            // Send notification NTC1
-            message.channel = AN_NTC_1;
-            message.temp = ntc_data[0];
-            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Send notification NTC2
+        message.channel = AN_NTC_2;
+        message.temp = ntc_data[1];
+        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
 
-            // Send notification NTC2
-            message.channel = AN_NTC_2;
-            message.temp = ntc_data[1];
-            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
-
-            vTaskDelay(30 / portTICK_PERIOD_MS);
-            ntc_loop_count = 0;
-        }
-        else
-        {
-            ntc_loop_count++;
-        }
-
-        // if (ntc_dev_get_temperature(handle, &ntc_data[index]) == ESP_OK)
-        // {
-        //     float temp = get_ntc_data_channel_temp(chan);
-        //     ESP_LOGI(ADC_TAG, "NTC CHANNEL %d temperature = %.2f C", chan, temp);
-        //     um_ev_message_ntc message = {
-        //         .channel = chan,
-        //         .temp = temp};
-        //     um_adc_update_values(chan, message.temp, 0);
-        //     esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
-        // }
-        vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);
+        vTaskDelay(30 / portTICK_PERIOD_MS);
+        ntc_loop_count = 0;
     }
-    ESP_ERROR_CHECK(ntc_dev_delete(ntc_chan_1_handle));
-    ESP_ERROR_CHECK(ntc_dev_delete(ntc_chan_2_handle));
-    vTaskDelete(NULL);
+    else
+    {
+        ntc_loop_count++;
+    }
+
+    // if (ntc_dev_get_temperature(handle, &ntc_data[index]) == ESP_OK)
+    // {
+    //     float temp = get_ntc_data_channel_temp(chan);
+    //     ESP_LOGI(ADC_TAG, "NTC CHANNEL %d temperature = %.2f C", chan, temp);
+    //     um_ev_message_ntc message = {
+    //         .channel = chan,
+    //         .temp = temp};
+    //     um_adc_update_values(chan, message.temp, 0);
+    //     esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_NTC, &message, sizeof(message), portMAX_DELAY);
+    // }
+    vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);
+    //}
+    // ESP_ERROR_CHECK(ntc_dev_delete(ntc_chan_1_handle));
+    // ESP_ERROR_CHECK(ntc_dev_delete(ntc_chan_2_handle));
+    // vTaskDelete(NULL);
 }
 
 /**
@@ -261,11 +248,11 @@ void init_adc()
     }
     else
     {
-        xTaskCreatePinnedToCore(ntc_queue_task, "ntc_task", 4096, NULL, 4, &adc_task_handle, 1);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        // xTaskCreatePinnedToCore(ntc_queue_task, "ntc2_task", 4096, (void *)ntc_chan_2_handle, 3, &adc_task_handle, 1);
-        // vTaskDelay(1000 / portTICK_PERIOD_MS);
-        xTaskCreatePinnedToCore(ai_queue_task, "ai_task", 4096, NULL, 4, &adc_task_handle, 1);
+        // xTaskCreatePinnedToCore(ntc_queue_task, "ntc_task", 4096, NULL, 4, &adc_task_handle, 1);
+        // vTaskDelay(100 / portTICK_PERIOD_MS);
+        //--// xTaskCreatePinnedToCore(ntc_queue_task, "ntc2_task", 4096, (void *)ntc_chan_2_handle, 3, &adc_task_handle, 1);
+        //--// vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // xTaskCreatePinnedToCore(ai_queue_task, "ai_task", 4096, NULL, 4, &adc_task_handle, 1);
     }
 
     // vTaskDelay(ADC_TASK_TIMEOUT / portTICK_PERIOD_MS);

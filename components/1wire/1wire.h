@@ -23,7 +23,7 @@ void um_onewire_prepare_config_file();
 
 void onewire_configure();
 
-void onewire_task(void *arg);
+void onewire_task();
 
 void um_onewire_init();
 

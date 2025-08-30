@@ -15,68 +15,68 @@ onewire_addr_t addresses[ONEWIRE_MAX_SENSORS] = {0};
 
 um_onewire_sensor_t sensors[ONEWIRE_MAX_SENSORS];
 
-TaskHandle_t onewire_task_handle = NULL;
+// TaskHandle_t onewire_task_handle = NULL;
 
 static unsigned short int total_loops = 6;
 static unsigned short int loop_count = 0;
 
-void onewire_task(void *arg)
+void onewire_task()
 {
     char string_address[18] = {0};
-    while (true)
+    ESP_LOGI(ONE_WIRE_TAG, "Run OW task on loop %d (max loops = %d)", loop_count, total_loops);
+    // while (true)
+    //{
+    for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++)
     {
-        for (int i = 0; i < ONEWIRE_MAX_SENSORS; i++)
+        if (addresses[i] != 0)
         {
-            if (addresses[i] != 0)
+            // queue_payload_ds18x20_t
+
+            onewire_uint64_t_to_addr_str(addresses[i], string_address);
+            uint8_t family_id = (uint8_t)addresses[i];
+            // family_id = (uint8_t)addresses[i];
+            switch (family_id)
             {
-                // queue_payload_ds18x20_t
+            case DS18X20_FAMILY_DS18B20:  // CASE ONE-WIRE TEMP SENSOR
+            case DS18X20_FAMILY_DS18S20:  // CASE ONE-WIRE TEMP SENSOR
+            case DS18X20_FAMILY_DS1822:   // CASE ONE-WIRE TEMP SENSOR
+            case DS18X20_FAMILY_MAX31850: // CASE ONE-WIRE TEMP SENSOR
+                float temp;
+                esp_err_t res = ds18x20_read_temp(addresses[i], &temp);
 
-                onewire_uint64_t_to_addr_str(addresses[i], string_address);
-                uint8_t family_id = (uint8_t)addresses[i];
-                // family_id = (uint8_t)addresses[i];
-                switch (family_id)
+                if (res == ESP_OK)
                 {
-                case DS18X20_FAMILY_DS18B20:  // CASE ONE-WIRE TEMP SENSOR
-                case DS18X20_FAMILY_DS18S20:  // CASE ONE-WIRE TEMP SENSOR
-                case DS18X20_FAMILY_DS1822:   // CASE ONE-WIRE TEMP SENSOR
-                case DS18X20_FAMILY_MAX31850: // CASE ONE-WIRE TEMP SENSOR
-                    float temp;
-                    esp_err_t res = ds18x20_read_temp(addresses[i], &temp);
-
-                    if (res == ESP_OK)
+                    ESP_LOGI(ONE_WIRE_TASK_TAG, "[%s]: temp is: %.2f°C, family_id: %d", string_address, temp, family_id);
+                    // Send notification 10sec*6times = every 60sec
+                    if (loop_count >= total_loops)
                     {
-                        ESP_LOGI(ONE_WIRE_TASK_TAG, "[%s]: temp is: %.2f°C, family_id: %d", string_address, temp, family_id);
-                        // Send notification 10sec*6times = every 60sec
-                        if (loop_count >= total_loops)
-                        {
-                            um_ev_message_onewire message = {
-                                .sn = string_address,
-                                .temp = temp};
-                            esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
-                            vTaskDelay(1000 / portTICK_PERIOD_MS);
-                        }
-
-                        um_onewire_update_state(addresses[i], temp);
-                        //  free(buff);
+                        um_ev_message_onewire message = {
+                            .sn = string_address,
+                            .temp = temp};
+                        esp_event_post(APP_EVENTS, EV_STATUS_CHANGED_OW, &message, sizeof(message), portMAX_DELAY);
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
                     }
-                    break;
 
-                default:
-                    break;
+                    um_onewire_update_state(addresses[i], temp);
                 }
+                break;
+
+            default:
+                break;
             }
         }
-        if (loop_count < total_loops)
-        {
-            loop_count++;
-        }
-        else
-        {
-            loop_count = 0;
-        }
-        vTaskDelay(ONEWIRE_TASK_TIMEOUT / portTICK_PERIOD_MS);
     }
-    vTaskDelete(NULL);
+    if (loop_count < total_loops)
+    {
+        loop_count++;
+    }
+    else
+    {
+        loop_count = 0;
+    }
+    // vTaskDelay(ONEWIRE_TASK_TIMEOUT / portTICK_PERIOD_MS);
+    //}
+    // vTaskDelete(NULL);
 }
 
 void um_onewire_update_state(uint64_t address, float temp)
@@ -88,50 +88,6 @@ void um_onewire_update_state(uint64_t address, float temp)
             sensors[i].value = temp;
             automations[i].value = temp;
             um_am_automation_run(&automations[i]);
-            // if (automations[i].ext)
-            // {
-            //     // Compare values
-            //     bool conditionMatch = false;
-            //     switch (automations[i].trigger.cond)
-            //     {
-            //     case UM_AM_TRIG_EQUAL:
-            //         conditionMatch = temp == automations[i].trigger.value;
-            //         break;
-            //     case UM_AM_TRIG_MORE:
-            //         conditionMatch = temp > automations[i].trigger.value;
-            //         break;
-            //     case UM_AM_TRIG_LESS:
-            //         conditionMatch = temp < automations[i].trigger.value;
-            //         break;
-            //     default:
-            //         // ,????проблема, не получится инвертровать состояние в событии
-            //         conditionMatch = automations[i].inverted;
-            //         break;
-            //     }
-            //     automations[i].inverted = conditionMatch;
-            //     um_am_main_t automation = automations[i];
-
-            //     // Fire automation
-            //     // ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION START ====================");
-            //     ESP_LOGW("FIRE_AUTOMATION", "Fire for i:%d, sn:%08llx, temp: %0.1f", i, sensors[i].address, temp);
-            //     for (int i = 0; i < 6; i++)
-            //     {
-            //         if (automation.opts.relay_action.on[i] != -1)
-            //         {
-            //             ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, !automation.inverted ? "ON" : "OFF");
-            //         }
-            //     }
-            //     for (int i = 0; i < 6; i++)
-            //     {
-            //         if (automation.opts.relay_action.off[i] != -1)
-            //         {
-            //             ESP_LOGW("FIRE_AUTOMATION", "[ON]Toggle relay i:%d state %s", i, automation.inverted ? "ON" : "OFF");
-            //         }
-            //     }
-            //     ESP_LOGW("FIRE_AUTOMATION", "%s", "============== FIRE_AUTOMATION END ====================");
-            //     esp_event_post(APP_EVENTS, EV_AUTOMATION_FIRED, (void *)&automation, sizeof(um_am_main_t), portMAX_DELAY);
-
-            // }
             break;
         }
     }
@@ -299,7 +255,7 @@ void um_onewire_init()
 
     esp_event_post(APP_EVENTS, EV_ONEWIRE_INIT, NULL, sizeof(NULL), portMAX_DELAY);
 
-    xTaskCreatePinnedToCore(onewire_task, "onewire_task", 4096, NULL, ONE_WIRE_TASK_PRIORITY, &onewire_task_handle, 1);
+    // xTaskCreatePinnedToCore(onewire_task, "onewire_task", 4096, NULL, ONE_WIRE_TASK_PRIORITY, &onewire_task_handle, 1);
 
     vTaskDelay(500 / portTICK_PERIOD_MS);
 
