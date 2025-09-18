@@ -1,7 +1,5 @@
 idf_component_register(SRCS "ethernet.c"
                        REQUIRES 
-                       driver
+                        driver
                         esp_eth 
-                       esp_netif
-                        vfs 
-                       fatfs)
+                        esp_netif)

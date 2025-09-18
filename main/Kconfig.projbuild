@@ -2,7 +2,7 @@
 menu "UMNI шина i2c"
     config UMNI_I2C_SDA
         int "i2c SDA pin"
-        default 21
+        default 23
         help
             GPIO SDA pin.
     config UMNI_I2C_SCL
@@ -16,12 +16,12 @@ endmenu
 menu "UMNI адаптер Opentherm"
     config UMNI_OT_OUT
         int "Выходной сигнал с линии Opentherm"
-        default 33
+        default 26
         help
             Выходной сигнал с линии Opentherm.
     config UMNI_OT_IN
         int "Входной сигнал с линии Opentherm"
-        default 32
+        default 25
         help
             Входной сигнал с линии Opentherm.
 endmenu
@@ -30,7 +30,11 @@ endmenu
 menu "UMNI SD card"
     config UMNI_SD_CS
         int "SD-CS пин карты памяти"
-        default 27
+        default 32
+
+        config UMNI_SD_CD
+        int "SD-CD пин карты памяти"
+        default 33
 
     config UMNI_SD_MOUNT_POINT
         string  "Точка монтирования SD карты"

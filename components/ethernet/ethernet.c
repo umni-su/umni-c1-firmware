@@ -15,12 +15,12 @@
 
 #endif // CONFIG_ETH_USE_SPI_ETHERNET
 
-#include "esp_vfs_fat.h"
+// #include "esp_vfs_fat.h"
 
-#if SOC_SDMMC_HOST_SUPPORTED
-#include "driver/sdmmc_host.h"
-#endif
-#include "sdmmc_cmd.h"
+// #if SOC_SDMMC_HOST_SUPPORTED
+// #include "driver/sdmmc_host.h"
+// #endif
+// #include "sdmmc_cmd.h"
 
 #include "ethernet.h"
 
@@ -267,7 +267,7 @@ esp_err_t ethernet_init(esp_eth_handle_t *eth_handles_out[], uint8_t *eth_cnt_ou
 
 #if CONFIG_UMNI_USE_SPI_ETHERNET
     ESP_GOTO_ON_ERROR(spi_bus_init(), err, TAG, "SPI bus init failed");
-    ESP_GOTO_ON_ERROR(init_fs(), err, TAG, "Init fs failed");
+    // ESP_GOTO_ON_ERROR(init_fs(), err, TAG, "Init fs failed");
     // Init specific SPI Ethernet module configuration from Kconfig (CS GPIO, Interrupt GPIO, etc.)
     spi_eth_module_config_t spi_eth_module_config[CONFIG_UMNI_SPI_ETHERNETS_NUM] = {0};
     INIT_SPI_ETH_MODULE_CONFIG(spi_eth_module_config, 0);
@@ -424,50 +424,50 @@ void ethernet_start()
     xTaskCreatePinnedToCore(ethernet_task, "init_ethernet", 4095, NULL, 13, &ethernet_handle, 0);
 }
 
-#if CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
-esp_err_t init_fs(void)
-{
-    esp_err_t ret = esp_vfs_semihost_register(CONFIG_UMNI_WEB_MOUNT_POINT);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(WEBSERVER_TAG, "Failed to register semihost driver (%s)!", esp_err_to_name(ret));
-        return ESP_FAIL;
-    }
-    else
-    {
-        ESP_LOGI(WEBSERVER_TAG, "Semihost register success");
-    }
-    return ESP_OK;
-}
-#endif
+// #if CONFIG_UMNI_WEB_DEPLOY_SEMIHOST
+// esp_err_t init_fs(void)
+// {
+//     esp_err_t ret = esp_vfs_semihost_register(CONFIG_UMNI_WEB_MOUNT_POINT);
+//     if (ret != ESP_OK)
+//     {
+//         ESP_LOGE(WEBSERVER_TAG, "Failed to register semihost driver (%s)!", esp_err_to_name(ret));
+//         return ESP_FAIL;
+//     }
+//     else
+//     {
+//         ESP_LOGI(WEBSERVER_TAG, "Semihost register success");
+//     }
+//     return ESP_OK;
+// }
+// #endif
 
-#if CONFIG_UMNI_WEB_DEPLOY_SD
+// #if CONFIG_UMNI_WEB_DEPLOY_SD
 
-esp_err_t init_fs(void)
-{
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = true,
-        .max_files = 5,
-        .allocation_unit_size = 16 * 1024};
-    sdmmc_card_t *card;
+// esp_err_t init_fs(void)
+// {
+//     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+//         .format_if_mount_failed = true,
+//         .max_files = 5,
+//         .allocation_unit_size = 16 * 1024};
+//     sdmmc_card_t *card;
 
-    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+//     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
 
-    slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
-    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.max_freq_khz = 12 * 1000; // пониженная частота для общения с SD SPI
-    slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
-    esp_err_t res = esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card);
-    if (res == ESP_OK)
-    {
-        sdmmc_card_print_info(stdout, card);
-        esp_event_post(APP_EVENTS, EV_SDCARD_MOUNTED, NULL, sizeof(NULL), portMAX_DELAY);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "Faled mount SD card %s", esp_err_to_name(res));
-    }
-    return res;
-}
+//     slot_config.gpio_cs = CONFIG_UMNI_SD_CS;
+//     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
+//     host.max_freq_khz = 12 * 1000; // пониженная частота для общения с SD SPI
+//     slot_config.host_id = CONFIG_UMNI_ETH_SPI_HOST;
+//     esp_err_t res = esp_vfs_fat_sdspi_mount(CONFIG_UMNI_SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card);
+//     if (res == ESP_OK)
+//     {
+//         sdmmc_card_print_info(stdout, card);
+//         esp_event_post(APP_EVENTS, EV_SDCARD_MOUNTED, NULL, sizeof(NULL), portMAX_DELAY);
+//     }
+//     else
+//     {
+//         ESP_LOGE(TAG, "Faled mount SD card %s", esp_err_to_name(res));
+//     }
+//     return res;
+// }
 
-#endif
+// #endif

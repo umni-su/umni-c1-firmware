@@ -203,7 +203,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         connected = true;
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
 
-        xTaskCreatePinnedToCore(um_mqtt_register_task, "mqtt_register_task", configMINIMAL_STACK_SIZE * 2, NULL, 5, &mqtt_register_handler, 1);
+        xTaskCreatePinnedToCore(um_mqtt_register_task, "mqtt_register_task", configMINIMAL_STACK_SIZE * 4, NULL, 5, &mqtt_register_handler, 1);
 
         // SUBSCRIBE HERE!
 
@@ -222,7 +222,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         connected = false;
-        if (mqtt_register_handler) {
+        if (mqtt_register_handler)
+        {
             vTaskDelete(mqtt_register_handler);
             mqtt_register_handler = NULL;
         }
@@ -243,61 +244,65 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_DATA:
     {
         ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
-        
+
         // Извлекаем топик из события
         char topic_buffer[64];
-        int topic_len = event->topic_len < sizeof(topic_buffer) - 1 ? 
-                    event->topic_len : sizeof(topic_buffer) - 1;
+        int topic_len = event->topic_len < sizeof(topic_buffer) - 1 ? event->topic_len : sizeof(topic_buffer) - 1;
         memcpy(topic_buffer, event->topic, topic_len);
         topic_buffer[topic_len] = '\0';
-        
+
         // Извлекаем данные
         char data_buffer[256];
-        int data_len = event->data_len < sizeof(data_buffer) - 1 ? 
-                    event->data_len : sizeof(data_buffer) - 1;
+        int data_len = event->data_len < sizeof(data_buffer) - 1 ? event->data_len : sizeof(data_buffer) - 1;
         memcpy(data_buffer, event->data, data_len);
         data_buffer[data_len] = '\0';
-        
+
         ESP_LOGD(MQTT_TAG, "Topic: %s, Data: %s", topic_buffer, data_buffer);
-        
+
         // Парсим только если данные есть
-        if (data_len > 0) {
+        if (data_len > 0)
+        {
             cJSON *json = cJSON_Parse(data_buffer);
-            if (json == NULL) {
+            if (json == NULL)
+            {
                 ESP_LOGE(MQTT_TAG, "Failed to parse JSON data");
                 break;
             }
-            
+
             // Определяем действие по топику
-            if (strstr(topic_buffer, UM_TOPIC_RELAY) != NULL) {
+            if (strstr(topic_buffer, UM_TOPIC_RELAY) != NULL)
+            {
                 // Обработка реле
                 cJSON *index_item = cJSON_GetObjectItem(json, "index");
                 cJSON *level_item = cJSON_GetObjectItem(json, "level");
-                
-                if (index_item && level_item && cJSON_IsNumber(index_item) && 
-                    cJSON_IsNumber(level_item)) {
+
+                if (index_item && level_item && cJSON_IsNumber(index_item) &&
+                    cJSON_IsNumber(level_item))
+                {
                     do_port_index_t index = index_item->valueint;
                     do_level_t level = level_item->valueint;
                     do_set_level(index, level);
                 }
             }
-            else if (strstr(topic_buffer, UM_TOPIC_PING) != NULL) {
+            else if (strstr(topic_buffer, UM_TOPIC_PING) != NULL)
+            {
                 // Ответ на пинг
                 cJSON *response = cJSON_CreateObject();
                 cJSON_AddStringToObject(response, "response", "pong");
                 cJSON_AddBoolToObject(response, "success", true);
-                
+
                 char *response_data = cJSON_PrintUnformatted(response);
                 um_mqtt_publish_data(UM_TOPIC_PONG, response_data);
-                
+
                 free(response_data);
                 cJSON_Delete(response);
             }
-            else if (strstr(topic_buffer, UM_TOPIC_OPENTHERM) != NULL) {
+            else if (strstr(topic_buffer, UM_TOPIC_OPENTHERM) != NULL)
+            {
                 // Обработка OpenTherm команд
                 // Добавьте свою логику здесь
             }
-            
+
             cJSON_Delete(json);
         }
         break;
@@ -320,9 +325,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     connection_status.success = connected;
 }
 
-char *_get_lwt_payload() {
+char *_get_lwt_payload()
+{
     static char lwt_topic[30]; // Статическая память (существует всегда)
-    snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/lwt", 
+    snprintf(lwt_topic, sizeof(lwt_topic), "%s%s/lwt",
              UM_TOPIC_PREFIX_DEVICE, name);
     return lwt_topic; // Указатель на постоянную память
 }
@@ -331,7 +337,8 @@ void um_mqtt_init()
 {
     um_mqtt_deinit();
 
-    if (client != NULL) {
+    if (client != NULL)
+    {
         ESP_LOGI(MQTT_TAG, "MQTT client already initialized");
         return;
     }
@@ -371,9 +378,7 @@ void um_mqtt_init()
             .msg = "offline",
             .msg_len = 7,
             .qos = 1,
-            .retain = true
-        }
-    };
+            .retain = true}};
     if (username != NULL && password != NULL)
     {
         mqtt_cfg.credentials.username = username;
@@ -389,19 +394,22 @@ void um_mqtt_init()
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_events, NULL));
 }
 
-void um_mqtt_deinit() {
-    if (client) {
+void um_mqtt_deinit()
+{
+    if (client)
+    {
         esp_mqtt_client_stop(client);
         esp_mqtt_client_destroy(client);
         client = NULL;
     }
     connected = false;
-    
+
     // Отписываемся от событий
     esp_event_handler_unregister(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_events);
-    
+
     // Останавливаем задачу регистрации
-    if (mqtt_register_handler) {
+    if (mqtt_register_handler)
+    {
         vTaskDelete(mqtt_register_handler);
         mqtt_register_handler = NULL;
     }

@@ -10,6 +10,7 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 
+#include "../components/sd/sd.h"
 #include "../components/ethernet/ethernet.h"
 #include "../components/webserver/webserver.h"
 #include "../components/nvs/nvs.h"
@@ -68,6 +69,15 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             break;
         case EV_NVS_OPENED:
             ethernet_start();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            um_sdcard_init();
+            // Инициализируем SD карту
+            while (!um_sd_card_detected())
+            {
+                ESP_LOGI("SD", "Trying to mount SD card");
+                um_sd_mount();
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
             um_ot_init();
             break;
 

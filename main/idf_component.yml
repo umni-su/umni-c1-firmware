@@ -16,3 +16,7 @@ dependencies:
   #   public: true
   espressif/ntc_driver: ^1.1.0
   espressif/mdns: ^1.7.0
+  esp-idf-lib/pcf8574: '*'
+  esp-idf-lib/i2cdev: '*'
+  esp-idf-lib/onewire: '*'
+  esp-idf-lib/ds18x20: '*'
