@@ -23,16 +23,19 @@ static sdmmc_card_t *sd_card = NULL;
 static void um_sd_cd_interrupt_task(void *arg)
 {
     int level = gpio_get_level(CONFIG_UMNI_SD_CD);
-    if (um_sd_card_detected())
+    printf("Level %d ", level);
+    if (level == 0)
     {
         esp_event_post(APP_EVENTS, EV_SDCARD_PUSH_IN, NULL, sizeof(NULL), portMAX_DELAY);
         ESP_LOGI(TAG, "SD card was inserted %d", level);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         um_sd_mount();
     }
     else
     {
         esp_event_post(APP_EVENTS, EV_SDCARD_PUSH_OUT, NULL, sizeof(NULL), portMAX_DELAY);
         ESP_LOGW(TAG, "SD card was ejected %d", level);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
         um_sd_unmount();
     }
 

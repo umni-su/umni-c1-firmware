@@ -222,12 +222,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         connected = false;
+        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
+
+        // Останавливаем задачу регистрации
         if (mqtt_register_handler)
         {
             vTaskDelete(mqtt_register_handler);
             mqtt_register_handler = NULL;
         }
-        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
+
+        // Не вызываем um_mqtt_deinit() здесь - клиент сам переподключится
+        // Логируем причину отключения если есть
+        if (event->error_handle)
+        {
+            ESP_LOGE(MQTT_TAG, "Disconnect reason: %d", event->error_handle->connect_return_code);
+        }
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -316,6 +325,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             log_error_if_nonzero("captured as transport's socket errno", event->error_handle->esp_transport_sock_errno);
             ESP_LOGI(MQTT_TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
         }
+        // Добавляем информацию о ошибке подключения
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED)
+        {
+            ESP_LOGE(MQTT_TAG, "Connection refused, error code: 0x%x", event->error_handle->connect_return_code);
+        }
         break;
     default:
         ESP_LOGI(MQTT_TAG, "Other event id:%d", event->event_id);
@@ -345,13 +359,18 @@ void um_mqtt_init()
 
     name = um_nvs_read_str(NVS_KEY_MACNAME);
     if (name == NULL || strlen(name) < 4)
-    { // UMNI
+    {
         ESP_LOGE(MQTT_TAG, "MQTT can not start, because NVS_KEY_MACNAME not exists in NVS!");
         return;
     }
+
     enabled = um_nvs_read_i8(NVS_KEY_MQTT_ENABLED) == 1;
     if (!enabled)
+    {
+        ESP_LOGI(MQTT_TAG, "MQTT disabled in settings");
         return;
+    }
+
     url = um_nvs_read_str(NVS_KEY_MQTT_HOST);
     port = um_nvs_read_i16(NVS_KEY_MQTT_PORT);
     username = um_nvs_read_str(NVS_KEY_MQTT_USER);
@@ -363,22 +382,27 @@ void um_mqtt_init()
     {
         port = 1883;
     }
-    size_t len = strlen(url);
-    char address_with_protocol[len + 10];
-    sprintf(address_with_protocol, "mqtt://%s", url);
 
     char *lwt_topic = _get_lwt_payload();
 
+    // Формируем URI с портом
+    char uri[256];
+    snprintf(uri, sizeof(uri), "mqtt://%s:%d", url, port);
+
     esp_mqtt_client_config_t mqtt_cfg = {
-        .broker.address.uri = address_with_protocol,
-        .broker.address.port = port,
+        .broker.address.uri = uri,
         .session.keepalive = 30,
+        .session.disable_keepalive = false,
+        .network.disable_auto_reconnect = false, // ВКЛЮЧАЕМ авто-реконнект
+        .network.reconnect_timeout_ms = 5000,    // Таймаут переподключения 5 сек
+        .task.stack_size = 6144,                 // Достаточный размер стека
         .session.last_will = {
-            .topic = lwt_topic, // "device/umnixxxxxx/lwt"
+            .topic = lwt_topic,
             .msg = "offline",
-            .msg_len = 7,
+            .msg_len = 8,
             .qos = 1,
             .retain = true}};
+
     if (username != NULL && password != NULL)
     {
         mqtt_cfg.credentials.username = username;
@@ -386,12 +410,22 @@ void um_mqtt_init()
         mqtt_cfg.credentials.authentication.password = password;
     }
 
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    // ИСПРАВЛЕНИЕ: используем глобальную переменную client
+    client = esp_mqtt_client_init(&mqtt_cfg);
+
+    if (client == NULL)
+    {
+        ESP_LOGE(MQTT_TAG, "Failed to initialize MQTT client");
+        return;
+    }
+
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_EVENT_ANY_BASE, ESP_EVENT_ANY_ID, &watch_events, NULL));
+
+    ESP_LOGI(MQTT_TAG, "MQTT client initialized with auto-reconnect");
 }
 
 void um_mqtt_deinit()

@@ -35,19 +35,6 @@ typedef struct Protocol
 
     /**
      * If true, interchange high and low logic levels in all transmissions.
-     *
-     * By default, RCSwitch assumes that any signals it sends or receives
-     * can be broken down into pulses which start with a high signal level,
-     * followed by a a low signal level. This is e.g. the case for the
-     * popular PT 2260 encoder chip, and thus many switches out there.
-     *
-     * But some devices do it the other way around, and start with a low
-     * signal level, followed by a high signal level, e.g. the HT6P20B. To
-     * accommodate this, one can set invertedSignal to true, which causes
-     * RCSwitch to change how it interprets any HighLow struct FOO: It will
-     * then assume transmissions start with a low signal lasting
-     * FOO.high*pulseLength microseconds, followed by a high signal lasting
-     * FOO.low*pulseLength microseconds.
      */
     bool invertedSignal;
 } Protocol;
@@ -55,9 +42,12 @@ typedef struct Protocol
 #endif /* MAIN_RXB6_RECEIVER_H_ */
 
 unsigned long esp_rf433_get_received_value();
-
 unsigned int esp_rf433_get_received_bit_length();
-
 void esp_rf433_reset_available();
-
 void esp_rf433_initialize(int pin, void *handler);
+
+// Функции для калибровки
+void esp_rf433_set_receive_tolerance(int tolerance);
+void esp_rf433_set_separation_limit(unsigned limit);
+int esp_rf433_get_receive_tolerance();
+unsigned esp_rf433_get_separation_limit();
