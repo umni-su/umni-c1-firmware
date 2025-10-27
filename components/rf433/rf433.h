@@ -4,9 +4,9 @@
 #define MAX_SEARCH_SENSORS 5
 #define SEARCH_TIMEOUT 15000
 
-// Конфигурация калибровки
+/// Конфигурация калибровки - ОПТИМИЗИРУЕМ параметры
 #define RF433_AUTO_CALIBRATION 0     // ВРЕМЕННО ВЫКЛЮЧИТЬ для отладки
-#define RF433_DEBOUNCE_TIME_MS 200   // УВЕЛИЧИТЬ базовое значение
+#define RF433_DEBOUNCE_TIME_MS 1000  // УВЕЛИЧИТЬ базовое значение для защиты от дублей
 #define RF433_MIN_PACKETS 1          // УМЕНЬШИТЬ до 1
 #define RF433_RECEIVER_DEBOUNCE_MS 0 // ВЫКЛЮЧИТЬ дебаунсинг приемника
 
