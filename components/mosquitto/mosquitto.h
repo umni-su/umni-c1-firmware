@@ -72,3 +72,15 @@ um_mqtt_status_t um_mqtt_get_connection_state();
 int um_mqtt_subscribe_to(char *topic);
 
 void um_um_mqtt_subscribe_to_base_events();
+
+/**
+ * Принудительное переподключение к MQTT брокеру
+ */
+void um_mqtt_reconnect();
+
+/**
+ * Проверка состояния подключения
+ */
+void um_mqtt_check_connection();
+
+char *_get_lwt_payload();
