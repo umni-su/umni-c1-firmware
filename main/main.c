@@ -37,6 +37,7 @@ void read_sensors(void *args)
 {
     while (true)
     {
+        ESP_LOGW("SENSORS", "Start reading sensors");
         onewire_task();
         ntc_queue_task();
         ai_queue_task();
@@ -57,15 +58,18 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
             um_rf_433_init();
             init_adc();
             um_onewire_init();
-            xTaskCreatePinnedToCore(read_sensors, "read_sensors", 4096, NULL, 3, &sensors_task_handle, 1);
+
             break;
         case EV_CONFIGURATION_READY:
-            webserver_start();
+
             //  Инициализируем входы при инициализации NVS
             //  чтобы обеспечить необходимый уровень при включении
             ESP_ERROR_CHECK(init_do());
             ESP_ERROR_CHECK(init_di());
 
+            webserver_start();
+            xTaskCreatePinnedToCore(read_sensors, "read_sensors", 4096, NULL, 3, &sensors_task_handle, 1);
+            um_ot_init();
             break;
         case EV_NVS_OPENED:
             ethernet_start();
@@ -78,7 +82,7 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
                 um_sd_mount();
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
             }
-            um_ot_init();
+
             break;
 
         case EV_SYSTEM_INSTALLED:
@@ -138,6 +142,25 @@ void watch_any_event(void *handler_arg, esp_event_base_t base, int32_t id, void 
     }
 }
 
+static void um_alarm_interrupt_task(void *arg)
+{
+    int level = gpio_get_level(GPIO_NUM_13);
+    if (level == 0)
+    {
+        ESP_LOGI(TAG, "ALARM OFF %d", level);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "ALARM ON %d", level);
+    }
+    vTaskDelete(NULL);
+}
+
+static void IRAM_ATTR um_catch_alarm_interrupts(void *args)
+{
+    xTaskCreate(um_alarm_interrupt_task, "sd_cd_interrupt_task", 2096, NULL, 2, NULL);
+}
+
 void app_main(void)
 {
 
@@ -149,4 +172,32 @@ void app_main(void)
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
 
     ESP_ERROR_CHECK(um_nvs_init());
+
+    gpio_reset_pin(GPIO_NUM_13);
+    gpio_set_direction(GPIO_NUM_13, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(GPIO_NUM_13, GPIO_FLOATING);
+    gpio_isr_handler_add(GPIO_NUM_13, um_catch_alarm_interrupts, NULL);
+    gpio_set_intr_type(GPIO_NUM_13, GPIO_INTR_ANYEDGE);
+    gpio_intr_enable(GPIO_NUM_13);
+
+    gpio_reset_pin(GPIO_NUM_12);
+    gpio_set_direction(GPIO_NUM_12, GPIO_MODE_OUTPUT);
+    gpio_set_pull_mode(GPIO_NUM_12, GPIO_FLOATING);
+    gpio_set_level(GPIO_NUM_12, 1);
+
+    gpio_reset_pin(GPIO_NUM_14);
+    gpio_set_direction(GPIO_NUM_14, GPIO_MODE_OUTPUT);
+    gpio_set_pull_mode(GPIO_NUM_14, GPIO_FLOATING);
+    gpio_set_level(GPIO_NUM_14, 1);
+
+    gpio_reset_pin(GPIO_NUM_15);
+    gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
+    gpio_set_pull_mode(GPIO_NUM_15, GPIO_FLOATING);
+    gpio_set_level(GPIO_NUM_15, 1);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    gpio_set_level(GPIO_NUM_15, 0);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    gpio_set_level(GPIO_NUM_15, 1);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    gpio_set_level(GPIO_NUM_15, 0);
 }

@@ -39,6 +39,8 @@ static void um_sd_cd_interrupt_task(void *arg)
         um_sd_unmount();
     }
 
+    esp_restart();
+
     vTaskDelete(NULL);
 }
 
@@ -63,14 +65,19 @@ static void IRAM_ATTR um_catch_sd_cd_interrupts(void *args)
  */
 void um_init_sd_cd(void)
 {
+
     // Убедитесь, что служба прерываний GPIO установлена
     gpio_install_isr_service(0);
 
+    gpio_reset_pin(CONFIG_UMNI_SD_CD);
     gpio_set_direction(CONFIG_UMNI_SD_CD, GPIO_MODE_INPUT);
     gpio_set_pull_mode(CONFIG_UMNI_SD_CD, GPIO_FLOATING);
     gpio_isr_handler_add(CONFIG_UMNI_SD_CD, um_catch_sd_cd_interrupts, NULL);
     gpio_set_intr_type(CONFIG_UMNI_SD_CD, GPIO_INTR_ANYEDGE);
     gpio_intr_enable(CONFIG_UMNI_SD_CD);
+
+    int level = gpio_get_level(CONFIG_UMNI_SD_CD);
+    printf("Level %d ", level);
 
     ESP_LOGI(TAG, "SD CD interrupt handler initialized with debouncing");
 }

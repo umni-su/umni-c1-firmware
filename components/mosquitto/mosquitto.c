@@ -123,6 +123,7 @@ void watch_events(void *handler_arg, esp_event_base_t base, int32_t id, void *ev
         id == EV_RF433_SENSOR ||
         id == EV_OT_SET_DATA)
     {
+        ESP_LOGI("test", "event!");
         cJSON *payload = cJSON_CreateObject();
         char *topic = NULL;
         switch (id)
@@ -300,6 +301,84 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             }
         }
         break;
+
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        // msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
+        // ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
+        break;
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_DATA:
+    {
+        ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
+
+        // Извлекаем топик из события
+        char topic_buffer[64];
+        int topic_len = event->topic_len < sizeof(topic_buffer) - 1 ? event->topic_len : sizeof(topic_buffer) - 1;
+        memcpy(topic_buffer, event->topic, topic_len);
+        topic_buffer[topic_len] = '\0';
+
+        // Извлекаем данные
+        char data_buffer[256];
+        int data_len = event->data_len < sizeof(data_buffer) - 1 ? event->data_len : sizeof(data_buffer) - 1;
+        memcpy(data_buffer, event->data, data_len);
+        data_buffer[data_len] = '\0';
+
+        ESP_LOGD(MQTT_TAG, "Topic: %s, Data: %s", topic_buffer, data_buffer);
+
+        // Парсим только если данные есть
+        if (data_len > 0)
+        {
+            cJSON *json = cJSON_Parse(data_buffer);
+            if (json == NULL)
+            {
+                ESP_LOGE(MQTT_TAG, "Failed to parse JSON data");
+                break;
+            }
+
+            // Определяем действие по топику
+            if (strstr(topic_buffer, UM_TOPIC_RELAY) != NULL)
+            {
+                // Обработка реле
+                cJSON *index_item = cJSON_GetObjectItem(json, "index");
+                cJSON *level_item = cJSON_GetObjectItem(json, "level");
+
+                if (index_item && level_item && cJSON_IsNumber(index_item) &&
+                    cJSON_IsNumber(level_item))
+                {
+                    do_port_index_t index = index_item->valueint;
+                    do_level_t level = level_item->valueint;
+                    do_set_level(index, level);
+                }
+            }
+            else if (strstr(topic_buffer, UM_TOPIC_PING) != NULL)
+            {
+                // Ответ на пинг
+                cJSON *response = cJSON_CreateObject();
+                cJSON_AddStringToObject(response, "response", "pong");
+                cJSON_AddBoolToObject(response, "success", true);
+
+                char *response_data = cJSON_PrintUnformatted(response);
+                um_mqtt_publish_data(UM_TOPIC_PONG, response_data);
+
+                free(response_data);
+                cJSON_Delete(response);
+            }
+            else if (strstr(topic_buffer, UM_TOPIC_OPENTHERM) != NULL)
+            {
+                // Обработка OpenTherm команд
+                //
+            }
+
+            cJSON_Delete(json);
+        }
+        break;
+    }
 
     // Остальные case остаются без изменений...
     case MQTT_EVENT_ERROR:

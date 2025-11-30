@@ -6,8 +6,8 @@
 #include "../../main/includes/events.h"
 #include "../nvs/nvs.h"
 
-#define OT_IN_PIN CONFIG_UMNI_OT_IN
-#define OT_OUT_PIN CONFIG_UMNI_OT_OUT
+#define OT_IN_PIN CONFIG_UMNI_OT_OUT
+#define OT_OUT_PIN CONFIG_UMNI_OT_IN
 #define ESP_INTR_FLAG_DEFAULT 0
 
 static int targetDHWTemp = 59;
